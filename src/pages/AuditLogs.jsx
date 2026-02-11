@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Header from '@/components/layout/Header';
 import { auditLogs, schools } from '@/data/mockData';
@@ -38,6 +38,9 @@ import {
   Trash2,
   Edit,
 } from 'lucide-react';
+import { TablePagination } from '@/components/ui/table-pagination';
+
+const PAGE_SIZE = 8;
 
 const AuditLogs = () => {
   const { user } = useAuth();
@@ -65,6 +68,8 @@ const AuditLogs = () => {
     );
   }
 
+  const [logPage, setLogPage] = useState(1);
+
   // Filter logs
   const filteredLogs = auditLogs.filter((log) => {
     const matchesSearch =
@@ -74,6 +79,13 @@ const AuditLogs = () => {
     const matchesAction = actionFilter === 'all' || log.action === actionFilter;
     return matchesSearch && matchesSchool && matchesAction;
   });
+
+  const logTotalPages = Math.ceil(filteredLogs.length / PAGE_SIZE) || 1;
+  const paginatedLogs = useMemo(() => {
+    const start = (logPage - 1) * PAGE_SIZE;
+    return filteredLogs.slice(start, start + PAGE_SIZE);
+  }, [filteredLogs, logPage]);
+  useEffect(() => setLogPage(1), [filteredLogs.length, searchQuery, schoolFilter, actionFilter]);
 
   const getActionIcon = (action) => {
     if (action.includes('Delivery')) return <Plus className="w-4 h-4 text-success" />;
@@ -183,7 +195,7 @@ const AuditLogs = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLogs.map((log) => (
+                {paginatedLogs.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-2">
@@ -228,6 +240,15 @@ const AuditLogs = () => {
             <div className="p-8 text-center text-muted-foreground">
               No audit logs found matching your criteria.
             </div>
+          )}
+          {filteredLogs.length > 0 && logTotalPages > 1 && (
+            <TablePagination
+              currentPage={logPage}
+              totalPages={logTotalPages}
+              totalItems={filteredLogs.length}
+              onPageChange={setLogPage}
+              itemLabel="logs"
+            />
           )}
         </div>
       </div>

@@ -49,14 +49,23 @@ import {
   Warehouse,
   Camera,
   ScanBarcode,
+  Calendar as CalendarIcon,
   Banknote,
   ChevronDown,
   ChevronUp,
   CheckCircle,
+  Printer,
+  FileText,
 } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
 import CameraScanDialog from '@/components/inventory/CameraScanDialog';
 import BarcodeScannerDialog from '@/components/inventory/BarcodeScannerDialog';
 import AddSchoolItemModal from '@/components/inventory/AddSchoolItemModal';
+import StockCardReport from '@/components/inventory/StockCardReport';
+import { TablePagination } from '@/components/ui/table-pagination';
+import html2pdf from 'html2pdf.js';
+
+const INV_PAGE_SIZE = 8;
 
 const Inventory = () => {
   const { user } = useAuth();
@@ -74,24 +83,26 @@ const Inventory = () => {
   );
   const [selectedItem, setSelectedItem] = useState(null);
   const [itemDeductions, setItemDeductions] = useState({});
-  
+  const [invPage, setInvPage] = useState(1);
+  const [rawInvPage, setRawInvPage] = useState(1);
+  const [showReportModal, setShowReportModal] = useState(false);
+
   // Date filter state
   const [dateFilterType, setDateFilterType] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
+  const [activeDateField, setActiveDateField] = useState(null); // 'start' | 'end' | null
   const dateRangeRef = useRef(null);
+  const reportRef = useRef(null);
 
   // Close date range panel when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dateRangeRef.current && !dateRangeRef.current.contains(event.target)) {
-        // Close if both dates are filled, keep open if only one date is filled
-        if (startDate && endDate) {
-          setIsDateRangeOpen(false);
-        } else if (!startDate && !endDate) {
-          setIsDateRangeOpen(false);
-        }
+        // Always close when clicking outside
+        setIsDateRangeOpen(false);
+        setActiveDateField(null);
       }
     };
 
@@ -100,13 +111,6 @@ const Inventory = () => {
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [isDateRangeOpen, startDate, endDate]);
-
-  // Reset filter to All Dates when panel closes with no dates selected
-  useEffect(() => {
-    if (!isDateRangeOpen && !startDate && !endDate && dateFilterType === 'range') {
-      setDateFilterType('all');
-    }
-  }, [isDateRangeOpen]);
 
   // Read school from query params when component mounts
   useEffect(() => {
@@ -257,6 +261,30 @@ const Inventory = () => {
     return [...baseInventory, ...additions];
   }, [selectedSchool, getSchoolInventory, getConditionOverride]);
 
+  const toISODateString = (date) => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const parseDateStringToLocalDate = (value) => {
+    if (!value) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const formatDateDisplay = (value) => {
+    if (!value) return '';
+    const date = parseDateStringToLocalDate(value);
+    return date.toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
   // Date filter logic
   const matchesDateFilter = (item) => {
     if (dateFilterType === 'all' || !item.dateAcquired) return true;
@@ -276,8 +304,8 @@ const Inventory = () => {
     }
     
     if (dateFilterType === 'range' && startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      const start = parseDateStringToLocalDate(startDate);
+      const end = parseDateStringToLocalDate(endDate);
       return itemDate >= start && itemDate <= end;
     }
     
@@ -297,6 +325,23 @@ const Inventory = () => {
       return matchesSearch && matchesCategory && matchesType && matchesDate;
     });
   }, [inventory, searchQuery, categoryFilter, typeFilter, dateFilterType, startDate, endDate]);
+
+  const invTotalPages = Math.ceil(filteredInventory.length / INV_PAGE_SIZE) || 1;
+  const paginatedInventory = useMemo(() => {
+    const start = (invPage - 1) * INV_PAGE_SIZE;
+    return filteredInventory.slice(start, start + INV_PAGE_SIZE);
+  }, [filteredInventory, invPage]);
+
+  const rawInvTotalPages = Math.ceil(rawInventory.length / INV_PAGE_SIZE) || 1;
+  const paginatedRawInventory = useMemo(() => {
+    const start = (rawInvPage - 1) * INV_PAGE_SIZE;
+    return rawInventory.slice(start, start + INV_PAGE_SIZE);
+  }, [rawInventory, rawInvPage]);
+
+  useEffect(() => {
+    setInvPage(1);
+  }, [filteredInventory.length, searchQuery, categoryFilter, typeFilter, dateFilterType, startDate, endDate, selectedSchool]);
+  useEffect(() => { setRawInvPage(1); }, [rawInventory.length]);
 
   const getConditionBadge = (condition) => {
     switch (condition) {
@@ -325,6 +370,69 @@ const Inventory = () => {
     }
     const school = schools.find((s) => s.id === selectedSchool);
     return school ? `Inventory for ${school.name}` : 'Inventory';
+  };
+
+  const getFiltersSummary = () => {
+    const parts = [];
+    if (searchQuery) parts.push(`Search: "${searchQuery}"`);
+    if (selectedSchool !== 'all') {
+      const school = schools.find((s) => s.id === selectedSchool);
+      parts.push(`School: ${school?.name || selectedSchool}`);
+    }
+    if (categoryFilter !== 'all') parts.push(`Category: ${categoryFilter}`);
+    if (typeFilter !== 'all') parts.push(`Type: ${typeFilter}`);
+    if (dateFilterType === 'yearly') parts.push('Date: This Year');
+    else if (dateFilterType === 'monthly') parts.push('Date: This Month');
+    else if (dateFilterType === 'range' && startDate && endDate) {
+      parts.push(`Date: ${formatDateDisplay(startDate)} – ${formatDateDisplay(endDate)}`);
+    }
+    return parts.length > 0 ? parts.join(' • ') : 'No filters applied (showing all)';
+  };
+
+  const getPdfOptions = () => ({
+    margin: [5, 12.7, 12.7, 12.7],
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  });
+
+  const handlePrintReport = async () => {
+    if (!reportRef.current || filteredInventory.length === 0) return;
+    const el = reportRef.current;
+    const opt = { ...getPdfOptions(), filename: null };
+    try {
+      const blob = await html2pdf().set(opt).from(el).outputPdf('blob');
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (win) {
+        setTimeout(() => {
+          win.print();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }, 500);
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Stock-Card-Report-${new Date().toISOString().slice(0, 10)}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error('Print failed:', err);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!reportRef.current || filteredInventory.length === 0) return;
+    const el = reportRef.current;
+    const opt = {
+      ...getPdfOptions(),
+      filename: `Stock-Card-Report-${new Date().toISOString().slice(0, 10)}.pdf`,
+    };
+    try {
+      await html2pdf().set(opt).from(el).save();
+    } catch (err) {
+      console.error('PDF export failed:', err);
+    }
   };
 
   return (
@@ -400,7 +508,7 @@ const Inventory = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {rawInventory.map((row) => (
+                      {paginatedRawInventory.map((row) => (
                         <TableRow key={row.id}>
                           <TableCell className="font-mono text-sm">{row.code}</TableCell>
                           <TableCell className="font-medium">{row.name}</TableCell>
@@ -430,16 +538,24 @@ const Inventory = () => {
                     No undistributed supplies. Add newly purchased items or scan to record government-funded supplies.
                   </div>
                 )}
+                {rawInventory.length > 0 && rawInvTotalPages > 1 && (
+                  <TablePagination
+                    currentPage={rawInvPage}
+                    totalPages={rawInvTotalPages}
+                    totalItems={rawInventory.length}
+                    onPageChange={setRawInvPage}
+                    itemLabel="items"
+                  />
+                )}
               </div>
             </CollapsibleContent>
           </Collapsible>
         )}
 
         {/* Actions Bar */}
-        <div className="flex flex-col md:flex-row gap-4 justify-between">
-          <div className="flex flex-wrap gap-3">
+        <div className="flex flex-row flex-nowrap items-center gap-3 overflow-x-auto">
             {/* Search */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search items..."
@@ -496,22 +612,47 @@ const Inventory = () => {
 
             {/* Date Filter with Custom Range Dropdown */}
             <div className="relative inline-block" ref={dateRangeRef}>
-              <Select value={dateFilterType} onValueChange={(value) => {
-                setDateFilterType(value);
-                if (value !== 'range') {
-                  setIsDateRangeOpen(false);
-                  setStartDate('');
-                  setEndDate('');
-                } else {
-                  setIsDateRangeOpen(true);
-                }
-              }}>
-                <SelectTrigger className="w-40" onClick={() => {
-                  if (dateFilterType === 'range' && !isDateRangeOpen) {
+              <Select
+                value={dateFilterType}
+                onValueChange={(value) => {
+                  setDateFilterType(value);
+                  if (value !== 'range') {
+                    setIsDateRangeOpen(false);
+                    setActiveDateField(null);
+                    setStartDate('');
+                    setEndDate('');
+                  } else {
                     setIsDateRangeOpen(true);
+                    // When switching into Custom Range, default focus to "From"
+                    setActiveDateField('start');
                   }
-                }}>
-                  <SelectValue placeholder="Date Filter" />
+                }}
+                onOpenChange={(open) => {
+                  // When the select dropdown closes while Custom Range is active,
+                  // show the custom range panel so the user can (re)edit dates.
+                  if (!open && dateFilterType === 'range') {
+                    setIsDateRangeOpen(true);
+                    setActiveDateField((prev) => prev || 'start');
+                  }
+                }}
+              >
+                <SelectTrigger
+                  className="w-44 md:w-52"
+                  onClick={() => {
+                    if (dateFilterType === 'range') {
+                      setIsDateRangeOpen(true);
+                      // Re-open for editing; keep existing dates but focus "From" by default
+                      setActiveDateField((prev) => prev || 'start');
+                    }
+                  }}
+                >
+                  {dateFilterType === 'range' && startDate && endDate ? (
+                    <span className="text-sm">
+                      {formatDateDisplay(startDate)} - {formatDateDisplay(endDate)}
+                    </span>
+                  ) : (
+                    <SelectValue placeholder="Date Filter" />
+                  )}
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Dates</SelectItem>
@@ -522,45 +663,101 @@ const Inventory = () => {
               </Select>
 
               {/* Date Range Float Panel */}
-              {dateFilterType === 'range' && (isDateRangeOpen || startDate || endDate) && (
-                <div className="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50">
-                  <div className="space-y-4">
+              {dateFilterType === 'range' && isDateRangeOpen && (
+                <div className="absolute top-full left-0 mt-2 w-[320px] bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50">
+                  <div className="space-y-3">
                     <div className="space-y-2">
                       <Label htmlFor="start-date">From</Label>
-                      <Input
+                      <button
+                        type="button"
+                        className="input-field flex items-center justify-between text-sm"
                         id="start-date"
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                      />
+                        onClick={() =>
+                          setActiveDateField((prev) => (prev === 'start' ? null : 'start'))
+                        }
+                      >
+                        <span>
+                          {startDate ? formatDateDisplay(startDate) : 'Select date'}
+                        </span>
+                        <CalendarIcon className="w-4 h-4 text-muted-foreground ml-2" />
+                      </button>
+
+                      {activeDateField === 'start' && (
+                        <div className="mt-2 rounded-lg border border-border bg-card">
+                          <Calendar
+                            mode="single"
+                            selected={startDate ? parseDateStringToLocalDate(startDate) : undefined}
+                            disabled={
+                              endDate ? { after: parseDateStringToLocalDate(endDate) } : undefined
+                            }
+                            onSelect={(date) => {
+                              if (!date) return;
+                              const iso = toISODateString(date);
+                              setStartDate(iso);
+                              const endLocal = endDate ? parseDateStringToLocalDate(endDate) : null;
+                              // If "To" is empty or before the new "From", align it with "From"
+                              if (!endLocal || endLocal < date) {
+                                setEndDate(iso);
+                              }
+                              setActiveDateField('end');
+                            }}
+                            initialFocus
+                          />
+                        </div>
+                      )}
                     </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="end-date">To</Label>
-                      <Input
+                      <button
+                        type="button"
+                        className="input-field flex items-center justify-between text-sm"
                         id="end-date"
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                      />
+                        onClick={() =>
+                          setActiveDateField((prev) => (prev === 'end' ? null : 'end'))
+                        }
+                      >
+                        <span>
+                          {endDate ? formatDateDisplay(endDate) : 'Select date'}
+                        </span>
+                        <CalendarIcon className="w-4 h-4 text-muted-foreground ml-2" />
+                      </button>
+
+                      {activeDateField === 'end' && (
+                        <div className="mt-2 rounded-lg border border-border bg-card">
+                          <Calendar
+                            mode="single"
+                            selected={endDate ? parseDateStringToLocalDate(endDate) : undefined}
+                            disabled={
+                              startDate ? { before: parseDateStringToLocalDate(startDate) } : undefined
+                            }
+                            onSelect={(date) => {
+                              if (!date) return;
+                              const iso = toISODateString(date);
+                              setEndDate(iso);
+                              setActiveDateField(null);
+                              setIsDateRangeOpen(false);
+                            }}
+                            initialFocus
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
             </div>
-          </div>
 
-          <div className="flex gap-2">
-            <Button variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
+          <Button size="sm" className="h-9 shrink-0 bg-yellow-400 hover:bg-yellow-500 text-black" onClick={() => setShowReportModal(true)}>
+            <Eye className="w-4 h-4 mr-2" />
+            View Report
+          </Button>
             {!isAdmin && (
-              <Button onClick={() => setShowAddSchoolItemModal(true)}>
+              <Button size="sm" className="h-9 shrink-0" onClick={() => setShowAddSchoolItemModal(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Item
               </Button>
             )}
-          </div>
         </div>
 
         {/* Stats Summary */}
@@ -598,7 +795,7 @@ const Inventory = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredInventory.slice(0, 50).map((item, index) => (
+                {paginatedInventory.map((item, index) => (
                   <TableRow
                     key={`${item.schoolId}-${item.id}-${index}`}
                     className={`cursor-pointer hover:bg-muted/50 transition-colors ${
@@ -679,10 +876,14 @@ const Inventory = () => {
             </div>
           )}
 
-          {filteredInventory.length > 50 && (
-            <div className="p-4 text-center text-sm text-muted-foreground border-t">
-              Showing 50 of {filteredInventory.length} items
-            </div>
+          {filteredInventory.length > 0 && invTotalPages > 1 && (
+            <TablePagination
+              currentPage={invPage}
+              totalPages={invTotalPages}
+              totalItems={filteredInventory.length}
+              onPageChange={setInvPage}
+              itemLabel="items"
+            />
           )}
         </div>
       </div>
@@ -874,6 +1075,46 @@ const Inventory = () => {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Inventory Report Modal - Stock Card format */}
+      <Dialog open={showReportModal} onOpenChange={setShowReportModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col print:max-w-none print:max-h-none print:border-0 print:shadow-none print:p-0">
+          <div className="overflow-y-auto flex-1 print:overflow-visible bg-white text-black p-0">
+            <div ref={reportRef} className="inventory-report-print min-h-0">
+              {filteredInventory.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  No items to report with the current filters.
+                </div>
+              ) : (
+                <StockCardReport
+                items={filteredInventory}
+                schoolId={selectedSchool === 'all' ? null : selectedSchool}
+                isAdmin={isAdmin}
+                filtersSummary={getFiltersSummary()}
+              />
+            )}
+            </div>
+          </div>
+          <DialogFooter className="print:hidden flex-shrink-0">
+            <Button variant="outline" onClick={() => setShowReportModal(false)}>
+              Close
+            </Button>
+            <Button
+              size="sm"
+              className="bg-yellow-400 hover:bg-yellow-500 text-black"
+              onClick={handleExportPdf}
+              disabled={filteredInventory.length === 0}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export Report
+            </Button>
+            <Button onClick={handlePrintReport} disabled={filteredInventory.length === 0}>
+              <Printer className="w-4 h-4 mr-2" />
+              Print Report
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

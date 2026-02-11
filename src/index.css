@@ -211,3 +211,48 @@
     border-color: hsl(var(--border));
   }
 }
+
+/* Inventory Report print styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .inventory-report-print,
+  .inventory-report-print * {
+    visibility: visible;
+  }
+  .inventory-report-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: none;
+    padding: 0;
+    margin: 0;
+    background: white;
+    color: black;
+  }
+  .inventory-report-print thead {
+    display: table-header-group;
+  }
+  .inventory-report-print tbody tr {
+    page-break-inside: auto;
+  }
+  .inventory-report-print .report-header {
+    page-break-after: avoid;
+  }
+  .inventory-report-print .report-filters {
+    page-break-after: avoid;
+  }
+  .inventory-report-print table {
+    page-break-inside: auto;
+  }
+  .inventory-report-print .stock-card {
+    page-break-inside: avoid;
+  }
+}
+
+@page {
+  size: A4;
+  margin: 1.5cm;
+}

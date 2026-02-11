@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Header from '@/components/layout/Header';
 import { movements, items, schools } from '@/data/mockData';
@@ -40,6 +40,9 @@ import {
   X,
   CheckCircle,
 } from 'lucide-react';
+import { TablePagination } from '@/components/ui/table-pagination';
+
+const PAGE_SIZE = 8;
 
 const Transactions = () => {
   const { user } = useAuth();
@@ -338,6 +341,14 @@ const Transactions = () => {
 
 // Transaction Table Component
 const TransactionTable = ({ transactions, getTypeBadge }) => {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.ceil(transactions.length / PAGE_SIZE) || 1;
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return transactions.slice(start, start + PAGE_SIZE);
+  }, [transactions, page]);
+  useEffect(() => setPage(1), [transactions.length]);
+
   if (transactions.length === 0) {
     return (
       <div className="card-elevated p-8 text-center text-muted-foreground">
@@ -361,7 +372,7 @@ const TransactionTable = ({ transactions, getTypeBadge }) => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactions.map((t) => (
+            {paginated.map((t) => (
               <TableRow key={t.id}>
                 <TableCell className="font-mono text-sm">{t.refNo}</TableCell>
                 <TableCell>
@@ -385,6 +396,15 @@ const TransactionTable = ({ transactions, getTypeBadge }) => {
           </TableBody>
         </Table>
       </div>
+      {totalPages > 1 && (
+        <TablePagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={transactions.length}
+          onPageChange={setPage}
+          itemLabel="transactions"
+        />
+      )}
     </div>
   );
 };

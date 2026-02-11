@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Header from '@/components/layout/Header';
 import { schools } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,9 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { TablePagination } from '@/components/ui/table-pagination';
+
+const PAGE_SIZE = 6;
 
 const Schools = () => {
   const navigate = useNavigate();
@@ -41,6 +44,14 @@ const Schools = () => {
     const matchesLevel = levelFilter === 'all' || school.level === levelFilter;
     return matchesSearch && matchesLevel;
   });
+
+  const [schoolPage, setSchoolPage] = useState(1);
+  const totalPages = Math.ceil(filteredSchools.length / PAGE_SIZE) || 1;
+  const paginatedSchools = useMemo(() => {
+    const start = (schoolPage - 1) * PAGE_SIZE;
+    return filteredSchools.slice(start, start + PAGE_SIZE);
+  }, [filteredSchools, schoolPage]);
+  useEffect(() => setSchoolPage(1), [filteredSchools.length, searchQuery, levelFilter]);
 
   const getScoreColor = (score) => {
     if (score >= 90) return 'text-success';
@@ -155,7 +166,7 @@ const Schools = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSchools.map((school) => (
+                {paginatedSchools.map((school) => (
                   <TableRow key={school.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -215,6 +226,15 @@ const Schools = () => {
             <div className="p-8 text-center text-muted-foreground">
               No schools found matching your criteria.
             </div>
+          )}
+          {filteredSchools.length > 0 && totalPages > 1 && (
+            <TablePagination
+              currentPage={schoolPage}
+              totalPages={totalPages}
+              totalItems={filteredSchools.length}
+              onPageChange={setSchoolPage}
+              itemLabel="schools"
+            />
           )}
         </div>
       </div>

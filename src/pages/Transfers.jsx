@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useTransfers } from '@/context/TransfersContext';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -32,8 +32,10 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeftRight, CheckCircle, XCircle, Clock, Eye, Building2, Send } from 'lucide-react';
+import { TablePagination } from '@/components/ui/table-pagination';
 
 const SDO_SCHOOL = { id: 'sdo', name: 'Schools Division Office of City of Baliuag' };
+const PAGE_SIZE = 8;
 const destinationSchools = schools.filter((s) => s.id !== 'sdo');
 
 const Transfers = () => {
@@ -69,6 +71,16 @@ const Transfers = () => {
       (t.schoolId === user?.schoolId || t.targetSchoolId === user?.schoolId)
     );
   });
+
+  const [transferPage, setTransferPage] = useState(1);
+  const transferTotalPages = Math.ceil(filteredTransfers.length / PAGE_SIZE) || 1;
+  const paginatedTransfers = useMemo(() => {
+    const start = (transferPage - 1) * PAGE_SIZE;
+    return filteredTransfers.slice(start, start + PAGE_SIZE);
+  }, [filteredTransfers, transferPage]);
+  useEffect(() => {
+    setTransferPage(1);
+  }, [filteredTransfers.length, statusFilter]);
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -231,7 +243,7 @@ const Transfers = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTransfers.map((transfer) => (
+                {paginatedTransfers.map((transfer) => (
                   <TableRow key={transfer.id}>
                     <TableCell className="font-mono text-sm">
                       {transfer.refNo}
@@ -278,6 +290,15 @@ const Transfers = () => {
             <div className="p-8 text-center text-muted-foreground">
               No transfer requests found.
             </div>
+          )}
+          {filteredTransfers.length > 0 && transferTotalPages > 1 && (
+            <TablePagination
+              currentPage={transferPage}
+              totalPages={transferTotalPages}
+              totalItems={filteredTransfers.length}
+              onPageChange={setTransferPage}
+              itemLabel="transfers"
+            />
           )}
         </div>
       </div>

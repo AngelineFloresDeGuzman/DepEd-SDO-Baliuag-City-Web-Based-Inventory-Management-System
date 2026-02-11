@@ -29,6 +29,9 @@ import {
   Banknote,
   PackageCheck,
 } from 'lucide-react';
+import { TablePagination } from '@/components/ui/table-pagination';
+
+const MODAL_PAGE_SIZE = 8;
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -40,6 +43,10 @@ const Dashboard = () => {
   const [showItemsModal, setShowItemsModal] = useState(false);
   const [showLowStockModal, setShowLowStockModal] = useState(false);
   const [showPendingTransfersModal, setShowPendingTransfersModal] = useState(false);
+  const [updatedSchoolsPage, setUpdatedSchoolsPage] = useState(1);
+  const [itemsModalPage, setItemsModalPage] = useState(1);
+  const [lowStockModalPage, setLowStockModalPage] = useState(1);
+  const [pendingTransfersModalPage, setPendingTransfersModalPage] = useState(1);
 
   const schoolsSectionRef = useRef(null);
 
@@ -85,6 +92,27 @@ const Dashboard = () => {
     () => divisionItems.filter((item) => item.quantity <= item.reorderLevel),
     [divisionItems]
   );
+
+  const paginatedUpdatedSchools = useMemo(() => {
+    const start = (updatedSchoolsPage - 1) * MODAL_PAGE_SIZE;
+    return schoolsUpdatedThisWeekList.slice(start, start + MODAL_PAGE_SIZE);
+  }, [schoolsUpdatedThisWeekList, updatedSchoolsPage]);
+  const updatedSchoolsTotalPages = Math.ceil(schoolsUpdatedThisWeekList.length / MODAL_PAGE_SIZE) || 1;
+  const paginatedDivisionItems = useMemo(() => {
+    const start = (itemsModalPage - 1) * MODAL_PAGE_SIZE;
+    return divisionItems.slice(start, start + MODAL_PAGE_SIZE);
+  }, [divisionItems, itemsModalPage]);
+  const divisionItemsTotalPages = Math.ceil(divisionItems.length / MODAL_PAGE_SIZE) || 1;
+  const paginatedLowStock = useMemo(() => {
+    const start = (lowStockModalPage - 1) * MODAL_PAGE_SIZE;
+    return lowStockDivisionItems.slice(start, start + MODAL_PAGE_SIZE);
+  }, [lowStockDivisionItems, lowStockModalPage]);
+  const lowStockTotalPages = Math.ceil(lowStockDivisionItems.length / MODAL_PAGE_SIZE) || 1;
+  const paginatedPendingTransfers = useMemo(() => {
+    const start = (pendingTransfersModalPage - 1) * MODAL_PAGE_SIZE;
+    return pendingTransfersList.slice(start, start + MODAL_PAGE_SIZE);
+  }, [pendingTransfersList, pendingTransfersModalPage]);
+  const pendingTransfersTotalPages = Math.ceil(pendingTransfersList.length / MODAL_PAGE_SIZE) || 1;
 
   const scrollToSchoolsOverview = () => {
     if (schoolsSectionRef.current) {
@@ -247,10 +275,10 @@ const Dashboard = () => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      schoolsUpdatedThisWeekList.map((school, index) => (
+                      paginatedUpdatedSchools.map((school, index) => (
                         <TableRow key={school.id}>
                           <TableCell className="font-medium text-muted-foreground">
-                            {index + 1}
+                            {(updatedSchoolsPage - 1) * MODAL_PAGE_SIZE + index + 1}
                           </TableCell>
                           <TableCell className="font-medium">{school.name}</TableCell>
                           <TableCell>
@@ -272,6 +300,15 @@ const Dashboard = () => {
                   </TableBody>
                 </Table>
               </div>
+              {schoolsUpdatedThisWeekList.length > 0 && updatedSchoolsTotalPages > 1 && (
+                <TablePagination
+                  currentPage={updatedSchoolsPage}
+                  totalPages={updatedSchoolsTotalPages}
+                  totalItems={schoolsUpdatedThisWeekList.length}
+                  onPageChange={setUpdatedSchoolsPage}
+                  itemLabel="schools"
+                />
+              )}
             </div>
           </DialogContent>
         </Dialog>
@@ -304,7 +341,7 @@ const Dashboard = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {divisionItems.map((item) => (
+                    {paginatedDivisionItems.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-mono text-sm">{item.code}</TableCell>
                         <TableCell className="font-medium">{item.name}</TableCell>
@@ -333,6 +370,15 @@ const Dashboard = () => {
                   </TableBody>
                 </Table>
               </div>
+              {divisionItems.length > 0 && divisionItemsTotalPages > 1 && (
+                <TablePagination
+                  currentPage={itemsModalPage}
+                  totalPages={divisionItemsTotalPages}
+                  totalItems={divisionItems.length}
+                  onPageChange={setItemsModalPage}
+                  itemLabel="items"
+                />
+              )}
             </div>
           </DialogContent>
         </Dialog>
@@ -371,7 +417,7 @@ const Dashboard = () => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      lowStockDivisionItems.map((item) => (
+                      paginatedLowStock.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell className="font-mono text-sm">{item.code}</TableCell>
                           <TableCell className="font-medium">{item.name}</TableCell>
@@ -394,6 +440,15 @@ const Dashboard = () => {
                   </TableBody>
                 </Table>
               </div>
+              {lowStockDivisionItems.length > 0 && lowStockTotalPages > 1 && (
+                <TablePagination
+                  currentPage={lowStockModalPage}
+                  totalPages={lowStockTotalPages}
+                  totalItems={lowStockDivisionItems.length}
+                  onPageChange={setLowStockModalPage}
+                  itemLabel="items"
+                />
+              )}
             </div>
           </DialogContent>
         </Dialog>
@@ -431,7 +486,7 @@ const Dashboard = () => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      pendingTransfersList.map((transfer) => (
+                      paginatedPendingTransfers.map((transfer) => (
                         <TableRow key={transfer.id}>
                           <TableCell className="font-mono text-sm">{transfer.refNo}</TableCell>
                           <TableCell>
@@ -467,6 +522,15 @@ const Dashboard = () => {
                   </TableBody>
                 </Table>
               </div>
+              {pendingTransfersList.length > 0 && pendingTransfersTotalPages > 1 && (
+                <TablePagination
+                  currentPage={pendingTransfersModalPage}
+                  totalPages={pendingTransfersTotalPages}
+                  totalItems={pendingTransfersList.length}
+                  onPageChange={setPendingTransfersModalPage}
+                  itemLabel="transfers"
+                />
+              )}
             </div>
           </DialogContent>
         </Dialog>

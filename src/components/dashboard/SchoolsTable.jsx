@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 
+const PAGE_SIZE = 6;
+
 const SchoolsTable = ({
   schools,
   searchQuery,
@@ -28,6 +30,18 @@ const SchoolsTable = ({
   onLevelChange,
 }) => {
   const navigate = useNavigate();
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(schools.length / PAGE_SIZE) || 1;
+  const paginatedSchools = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return schools.slice(start, start + PAGE_SIZE);
+  }, [schools, currentPage]);
+
+  // Reset to page 1 when schools list changes (e.g. search/filter)
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [schools.length, searchQuery, levelFilter]);
 
   const getScoreColor = (score) => {
     if (score >= 90) return 'text-success';
@@ -90,7 +104,7 @@ const SchoolsTable = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {schools.map((school) => (
+            {paginatedSchools.map((school) => (
               <TableRow
                 key={school.id}
                 className="cursor-pointer hover:bg-muted/50"
@@ -119,6 +133,38 @@ const SchoolsTable = ({
       {schools.length === 0 && (
         <div className="p-8 text-center text-muted-foreground">
           No schools found matching your criteria.
+        </div>
+      )}
+
+      {/* Wizard-style pagination */}
+      {schools.length > 0 && totalPages > 1 && (
+        <div className="p-4 border-t border-border flex items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+            <span className="ml-2 text-muted-foreground/80">
+              ({schools.length} schools)
+            </span>
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              Next
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
         </div>
       )}
     </div>
