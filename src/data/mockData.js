@@ -59,45 +59,53 @@ export const items = [
   { id: "item005", code: "OS-005", name: "Ink, Epson 003, Black Btl", category: "Office Supplies", unit: "Bottle", type: "Consumable", reorderLevel: 5, isActive: true },
   { id: "item006", code: "OS-006", name: "Ink, Epson 003, Set", category: "Office Supplies", unit: "Set", type: "Consumable", reorderLevel: 3, isActive: true },
   { id: "item007", code: "OS-007", name: "Folder, Legal, Pc", category: "Office Supplies", unit: "Piece", type: "Consumable", reorderLevel: 100, isActive: true },
-  { id: "item008", code: "OS-008", name: "Stapler", category: "Office Supplies", unit: "Piece", type: "Asset", reorderLevel: 2, isActive: true },
-  { id: "item009", code: "OS-009", name: "Puncher, HD", category: "Office Supplies", unit: "Piece", type: "Asset", reorderLevel: 2, isActive: true },
-  { id: "item010", code: "OS-010", name: "Calculator", category: "Office Supplies", unit: "Piece", type: "Asset", reorderLevel: 2, isActive: true },
-  { id: "item011", code: "OS-011", name: "Flash Drive, 64GB", category: "Office Supplies", unit: "Piece", type: "Asset", reorderLevel: 3, isActive: true },
+  { id: "item008", code: "OS-008", name: "Stapler", category: "Office Supplies", unit: "Piece", type: "Semi-Expendable", reorderLevel: 2, isActive: true },
+  { id: "item009", code: "OS-009", name: "Puncher, HD", category: "Office Supplies", unit: "Piece", type: "Semi-Expendable", reorderLevel: 2, isActive: true },
+  { id: "item010", code: "OS-010", name: "Calculator", category: "Office Supplies", unit: "Piece", type: "Semi-Expendable", reorderLevel: 2, isActive: true },
+  { id: "item011", code: "OS-011", name: "Flash Drive, 64GB", category: "Office Supplies", unit: "Piece", type: "Semi-Expendable", reorderLevel: 3, isActive: true },
   { id: "item012", code: "OS-012", name: "Correction Tape", category: "Office Supplies", unit: "Piece", type: "Consumable", reorderLevel: 20, isActive: true },
-  { id: "item013", code: "ICT-001", name: "Printer, Epson L121", category: "ICT Equipment", unit: "Unit", type: "Asset", reorderLevel: 1, isActive: true },
-  { id: "item014", code: "ICT-002", name: "Printer, Epson L3210", category: "ICT Equipment", unit: "Unit", type: "Asset", reorderLevel: 1, isActive: true },
-  { id: "item015", code: "ICT-003", name: "Monitor, 24 in", category: "ICT Equipment", unit: "Unit", type: "Asset", reorderLevel: 1, isActive: true },
-  { id: "item016", code: "ICT-004", name: "Wireless Keyboard with Mouse", category: "ICT Equipment", unit: "Set", type: "Asset", reorderLevel: 2, isActive: true },
-  { id: "item017", code: "ICT-005", name: "Laminating Machine", category: "ICT Equipment", unit: "Unit", type: "Asset", reorderLevel: 1, isActive: true },
+  { id: "item013", code: "ICT-001", name: "Printer, Epson L121", category: "ICT Equipment", unit: "Unit", type: "Semi-Expendable", reorderLevel: 1, isActive: true },
+  { id: "item014", code: "ICT-002", name: "Printer, Epson L3210", category: "ICT Equipment", unit: "Unit", type: "Semi-Expendable", reorderLevel: 1, isActive: true },
+  { id: "item015", code: "ICT-003", name: "Monitor, 24 in", category: "ICT Equipment", unit: "Unit", type: "Semi-Expendable", reorderLevel: 1, isActive: true },
+  { id: "item016", code: "ICT-004", name: "Wireless Keyboard with Mouse", category: "ICT Equipment", unit: "Set", type: "Semi-Expendable", reorderLevel: 2, isActive: true },
+  { id: "item017", code: "ICT-005", name: "Laminating Machine", category: "ICT Equipment", unit: "Unit", type: "Semi-Expendable", reorderLevel: 1, isActive: true },
   { id: "item018", code: "MED-001", name: "Alcohol, 1 Gal", category: "Medical Supplies", unit: "Gallon", type: "Consumable", reorderLevel: 5, isActive: true },
   { id: "item019", code: "MED-002", name: "Facemask, Box", category: "Medical Supplies", unit: "Box", type: "Consumable", reorderLevel: 10, isActive: true },
   { id: "item020", code: "MED-003", name: "Band Aid, Pack", category: "Medical Supplies", unit: "Pack", type: "Consumable", reorderLevel: 5, isActive: true },
   { id: "item021", code: "CLN-001", name: "Bleach, Gallon", category: "Cleaning Materials", unit: "Gallon", type: "Consumable", reorderLevel: 5, isActive: true },
   { id: "item022", code: "CLN-002", name: "Dishwashing Liquid, 1.5L", category: "Cleaning Materials", unit: "Bottle", type: "Consumable", reorderLevel: 5, isActive: true },
-  { id: "item023", code: "CLN-003", name: "Floor Mop", category: "Cleaning Materials", unit: "Piece", type: "Asset", reorderLevel: 3, isActive: true },
-  { id: "item024", code: "PPE-001", name: "Reflectorized Vest", category: "Personal Protective Equipment", unit: "Piece", type: "Asset", reorderLevel: 5, isActive: true },
-  { id: "item025", code: "PPE-002", name: "Fire Extinguisher", category: "Personal Protective Equipment", unit: "Unit", type: "Asset", reorderLevel: 2, isActive: true },
-  { id: "item026", code: "ELC-001", name: "Emergency Lights", category: "Electrical Equipment", unit: "Unit", type: "Asset", reorderLevel: 2, isActive: true },
-  { id: "item027", code: "ELC-002", name: "Wall Clock", category: "Electrical Equipment", unit: "Piece", type: "Asset", reorderLevel: 2, isActive: true },
-  { id: "item028", code: "FUR-001", name: "Office Chair", category: "Furniture & Fixtures", unit: "Piece", type: "Asset", reorderLevel: 3, isActive: true },
-  { id: "item029", code: "FUR-002", name: "Steel Cabinet, 4 Drawers", category: "Furniture & Fixtures", unit: "Unit", type: "Asset", reorderLevel: 1, isActive: true },
-  { id: "item030", code: "SPT-001", name: "Basketball, Size 6", category: "Sports Equipment", unit: "Piece", type: "Asset", reorderLevel: 3, isActive: true },
+  { id: "item023", code: "CLN-003", name: "Floor Mop", category: "Cleaning Materials", unit: "Piece", type: "Semi-Expendable", reorderLevel: 3, isActive: true },
+  { id: "item024", code: "PPE-001", name: "Reflectorized Vest", category: "Personal Protective Equipment", unit: "Piece", type: "Semi-Expendable", reorderLevel: 5, isActive: true },
+  { id: "item025", code: "PPE-002", name: "Fire Extinguisher", category: "Personal Protective Equipment", unit: "Unit", type: "Semi-Expendable", reorderLevel: 2, isActive: true },
+  { id: "item026", code: "ELC-001", name: "Emergency Lights", category: "Electrical Equipment", unit: "Unit", type: "Semi-Expendable", reorderLevel: 2, isActive: true },
+  { id: "item027", code: "ELC-002", name: "Wall Clock", category: "Electrical Equipment", unit: "Piece", type: "Semi-Expendable", reorderLevel: 2, isActive: true },
+  { id: "item028", code: "FUR-001", name: "Office Chair", category: "Furniture & Fixtures", unit: "Piece", type: "Semi-Expendable", reorderLevel: 3, isActive: true },
+  { id: "item029", code: "FUR-002", name: "Steel Cabinet, 4 Drawers", category: "Furniture & Fixtures", unit: "Unit", type: "Semi-Expendable", reorderLevel: 1, isActive: true },
+  { id: "item030", code: "SPT-001", name: "Basketball, Size 6", category: "Sports Equipment", unit: "Piece", type: "Semi-Expendable", reorderLevel: 3, isActive: true },
 ];
 
 export const generateInventory = (schoolId) => {
   const conditions = ["Good", "Good", "Good", "Damaged", "For Repair"];
+  const today = new Date();
 
-  return items.map((item) => ({
-    ...item,
-    schoolId,
-    quantity: Math.floor(Math.random() * 50) + 1,
-    condition: conditions[Math.floor(Math.random() * conditions.length)],
-    lastUpdated: new Date(
-      Date.now() - Math.floor(Math.random() * 7) * 24 * 60 * 60 * 1000
-    )
-      .toISOString()
-      .split("T")[0],
-  }));
+  return items.map((item) => {
+    const daysAgo = Math.floor(Math.random() * 90) + 1;
+    const dateAcquired = new Date(today);
+    dateAcquired.setDate(dateAcquired.getDate() - daysAgo);
+    
+    return {
+      ...item,
+      schoolId,
+      quantity: Math.floor(Math.random() * 50) + 1,
+      condition: conditions[Math.floor(Math.random() * conditions.length)],
+      dateAcquired: dateAcquired.toISOString().split("T")[0],
+      lastUpdated: new Date(
+        Date.now() - Math.floor(Math.random() * 7) * 24 * 60 * 60 * 1000
+      )
+        .toISOString()
+        .split("T")[0],
+    };
+  });
 };
 
 export const movements = [

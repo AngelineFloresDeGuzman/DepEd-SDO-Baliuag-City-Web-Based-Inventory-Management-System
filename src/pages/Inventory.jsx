@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRawInventory } from '@/context/RawInventoryContext';
 import { useSchoolInventory } from '@/context/SchoolInventoryContext';
 import { useNotifications } from '@/context/NotificationsContext';
+import { useSearchParams } from 'react-router-dom';
 import Header from '@/components/layout/Header';
 import { items, generateInventory, categories, schools } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+
 import {
   Search,
   Filter,
@@ -62,6 +64,7 @@ const Inventory = () => {
   const { addToSchoolInventory, getSchoolInventory, updateSchoolInventory, setConditionOverride, getConditionOverride } = useSchoolInventory();
   const { addNotification } = useNotifications();
   const isAdmin = user?.role === 'sdo_admin';
+  const [searchParams] = useSearchParams();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -70,6 +73,48 @@ const Inventory = () => {
     isAdmin ? 'all' : user?.schoolId || ''
   );
   const [selectedItem, setSelectedItem] = useState(null);
+  const [itemDeductions, setItemDeductions] = useState({});
+  
+  // Date filter state
+  const [dateFilterType, setDateFilterType] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
+  const dateRangeRef = useRef(null);
+
+  // Close date range panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dateRangeRef.current && !dateRangeRef.current.contains(event.target)) {
+        // Close if both dates are filled, keep open if only one date is filled
+        if (startDate && endDate) {
+          setIsDateRangeOpen(false);
+        } else if (!startDate && !endDate) {
+          setIsDateRangeOpen(false);
+        }
+      }
+    };
+
+    if (isDateRangeOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isDateRangeOpen, startDate, endDate]);
+
+  // Reset filter to All Dates when panel closes with no dates selected
+  useEffect(() => {
+    if (!isDateRangeOpen && !startDate && !endDate && dateFilterType === 'range') {
+      setDateFilterType('all');
+    }
+  }, [isDateRangeOpen]);
+
+  // Read school from query params when component mounts
+  useEffect(() => {
+    const schoolParam = searchParams.get('school');
+    if (schoolParam) {
+      setSelectedSchool(schoolParam);
+    }
+  }, [searchParams]); // Track deductions per item
 
   // School: add item modal
   const [showAddSchoolItemModal, setShowAddSchoolItemModal] = useState(false);
@@ -212,6 +257,33 @@ const Inventory = () => {
     return [...baseInventory, ...additions];
   }, [selectedSchool, getSchoolInventory, getConditionOverride]);
 
+  // Date filter logic
+  const matchesDateFilter = (item) => {
+    if (dateFilterType === 'all' || !item.dateAcquired) return true;
+    
+    const itemDate = new Date(item.dateAcquired);
+    const today = new Date();
+
+    if (dateFilterType === 'yearly') {
+      return itemDate.getFullYear() === today.getFullYear();
+    }
+    
+    if (dateFilterType === 'monthly') {
+      return (
+        itemDate.getFullYear() === today.getFullYear() &&
+        itemDate.getMonth() === today.getMonth()
+      );
+    }
+    
+    if (dateFilterType === 'range' && startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      return itemDate >= start && itemDate <= end;
+    }
+    
+    return true;
+  };
+
   // Filter inventory
   const filteredInventory = useMemo(() => {
     return inventory.filter((item) => {
@@ -221,9 +293,10 @@ const Inventory = () => {
       const matchesCategory =
         categoryFilter === 'all' || item.category === categoryFilter;
       const matchesType = typeFilter === 'all' || item.type === typeFilter;
-      return matchesSearch && matchesCategory && matchesType;
+      const matchesDate = matchesDateFilter(item);
+      return matchesSearch && matchesCategory && matchesType && matchesDate;
     });
-  }, [inventory, searchQuery, categoryFilter, typeFilter]);
+  }, [inventory, searchQuery, categoryFilter, typeFilter, dateFilterType, startDate, endDate]);
 
   const getConditionBadge = (condition) => {
     switch (condition) {
@@ -246,10 +319,18 @@ const Inventory = () => {
 
   const isLowStock = (item) => item.quantity <= item.reorderLevel;
 
+  const getInventoryTitle = () => {
+    if (!isAdmin || selectedSchool === 'all') {
+      return 'Inventory';
+    }
+    const school = schools.find((s) => s.id === selectedSchool);
+    return school ? `Inventory for ${school.name}` : 'Inventory';
+  };
+
   return (
     <div className="min-h-screen">
       <Header
-        title="Inventory"
+        title={getInventoryTitle()}
         subtitle={
           isAdmin
             ? 'Division-wide inventory management'
@@ -412,6 +493,60 @@ const Inventory = () => {
                 <SelectItem value="Asset">Asset</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* Date Filter with Custom Range Dropdown */}
+            <div className="relative inline-block" ref={dateRangeRef}>
+              <Select value={dateFilterType} onValueChange={(value) => {
+                setDateFilterType(value);
+                if (value !== 'range') {
+                  setIsDateRangeOpen(false);
+                  setStartDate('');
+                  setEndDate('');
+                } else {
+                  setIsDateRangeOpen(true);
+                }
+              }}>
+                <SelectTrigger className="w-40" onClick={() => {
+                  if (dateFilterType === 'range' && !isDateRangeOpen) {
+                    setIsDateRangeOpen(true);
+                  }
+                }}>
+                  <SelectValue placeholder="Date Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Dates</SelectItem>
+                  <SelectItem value="yearly">This Year</SelectItem>
+                  <SelectItem value="monthly">This Month</SelectItem>
+                  <SelectItem value="range">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Date Range Float Panel */}
+              {dateFilterType === 'range' && (isDateRangeOpen || startDate || endDate) && (
+                <div className="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="start-date">From</Label>
+                      <Input
+                        id="start-date"
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="end-date">To</Label>
+                      <Input
+                        id="end-date"
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -455,16 +590,21 @@ const Inventory = () => {
                   {selectedSchool === 'all' && <TableHead>School</TableHead>}
                   <TableHead>Category</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead className="text-center">Qty</TableHead>
                   <TableHead>Unit</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-center">Qty</TableHead>
+                  <TableHead className="text-center">Deducted</TableHead>
+                  <TableHead className="text-center">Balance</TableHead>
+                  <TableHead>Date Acquired</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredInventory.slice(0, 50).map((item, index) => (
                   <TableRow
                     key={`${item.schoolId}-${item.id}-${index}`}
-                    className={isLowStock(item) ? 'bg-warning/5' : ''}
+                    className={`cursor-pointer hover:bg-muted/50 transition-colors ${
+                      isLowStock(item) ? 'bg-warning/5' : ''
+                    }`}
+                    onClick={() => setSelectedItem(item)}
                   >
                     <TableCell className="font-mono text-sm">{item.code}</TableCell>
                     <TableCell className="font-medium">
@@ -486,20 +626,46 @@ const Inventory = () => {
                         {item.type}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-center font-semibold">
-                      {item.quantity}
-                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {item.unit}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedItem(item)}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
+                    <TableCell className="text-center font-semibold">
+                      {item.quantity}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        min={0}
+                        max={item.quantity}
+                        value={itemDeductions[`${item.schoolId}-${item.id}`] || 0}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          const inputValue = e.target.value;
+                          let newValue = 0;
+                          
+                          if (inputValue === '') {
+                            newValue = 0;
+                          } else {
+                            const parsed = parseInt(inputValue, 10);
+                            if (!isNaN(parsed)) {
+                              newValue = Math.max(0, Math.min(item.quantity, parsed));
+                            }
+                          }
+                          
+                          setItemDeductions((prev) => ({
+                            ...prev,
+                            [`${item.schoolId}-${item.id}`]: newValue,
+                          }));
+                        }}
+                        className="w-16 h-8 text-center"
+                      />
+                    </TableCell>
+                    <TableCell className="text-center font-semibold">
+                      {item.quantity - (itemDeductions[`${item.schoolId}-${item.id}`] || 0)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {item.dateAcquired ? new Date(item.dateAcquired).toLocaleDateString('en-PH') : '—'}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -632,39 +798,68 @@ const Inventory = () => {
 
           {selectedItem && (
             <div className="space-y-4">
+              {/* Item Image Placeholder */}
+              <div className="w-full h-48 rounded-lg bg-muted flex items-center justify-center border border-border">
+                <Package className="w-12 h-12 text-muted-foreground" />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Item Code</p>
-                  <p className="font-mono font-medium">{selectedItem.code}</p>
+                  <p className="text-sm font-mono">{selectedItem.code}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Item Name</p>
-                  <p className="font-medium">{selectedItem.name}</p>
+                  <p className="text-sm">{selectedItem.name}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Category</p>
-                  <p>{selectedItem.category}</p>
+                  <p className="text-sm">{selectedItem.category}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Type</p>
-                  <Badge variant="outline">{selectedItem.type}</Badge>
+                  <Badge variant="outline" className="text-xs">{selectedItem.type}</Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Unit</p>
+                  <p className="text-sm">{selectedItem.unit}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Quantity</p>
-                  <p className="text-xl font-bold">
-                    {selectedItem.quantity} {selectedItem.unit}
-                  </p>
+                  <p className="text-sm">{selectedItem.quantity}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Reorder Level</p>
-                  <p>
-                    {selectedItem.reorderLevel} {selectedItem.unit}
+                  <p className="text-sm text-muted-foreground">Deducted</p>
+                  <p className="text-sm">{itemDeductions[`${selectedItem.schoolId}-${selectedItem.id}`] || 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Balance</p>
+                  <p className="text-sm">{selectedItem.quantity - (itemDeductions[`${selectedItem.schoolId}-${selectedItem.id}`] || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date Acquired</p>
+                  <p className="text-sm">
+                    {selectedItem.dateAcquired
+                      ? new Date(selectedItem.dateAcquired).toLocaleDateString('en-PH', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '—'}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Last Updated</p>
-                  <p>
-                    {new Date(selectedItem.lastUpdated).toLocaleDateString('en-PH')}
+                  <p className="text-sm">
+                    {new Date(selectedItem.lastUpdated).toLocaleDateString('en-PH', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </p>
                 </div>
               </div>

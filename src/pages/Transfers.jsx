@@ -52,6 +52,7 @@ const Transfers = () => {
   const [newTransferItemId, setNewTransferItemId] = useState('');
   const [newTransferQuantity, setNewTransferQuantity] = useState(1);
   const [newTransferDestinationId, setNewTransferDestinationId] = useState('');
+  const [newTransferSourceOfFund, setNewTransferSourceOfFund] = useState('');
   const [newTransferNote, setNewTransferNote] = useState('');
   const [newTransferSuccess, setNewTransferSuccess] = useState(false);
 
@@ -124,6 +125,7 @@ const Transfers = () => {
       refNo,
       items: [{ itemId: item.id, itemName: item.name, quantity: newTransferQuantity }],
       reason: newTransferNote.trim() || 'Transfer from SDO warehouse.',
+      sourceOfFund: newTransferSourceOfFund,
       createdBy: user?.uid || 'admin1',
       createdAt: now.toISOString(),
     };
@@ -148,6 +150,7 @@ const Transfers = () => {
     setNewTransferItemId('');
     setNewTransferQuantity(1);
     setNewTransferDestinationId('');
+    setNewTransferSourceOfFund('');
     setNewTransferNote('');
     setNewTransferSuccess(true);
     setTimeout(() => setNewTransferSuccess(false), 3000);
@@ -401,6 +404,21 @@ const Transfers = () => {
             </div>
 
             <div>
+              <Label>Source Of Fund *</Label>
+              <Select value={newTransferSourceOfFund} onValueChange={setNewTransferSourceOfFund}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select source of fund" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MOOE">MOOE</SelectItem>
+                  <SelectItem value="LSB/LGU">LSB/LGU</SelectItem>
+                  <SelectItem value="Donation">Donation</SelectItem>
+                  <SelectItem value="Others">Others</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
               <Label>Note</Label>
               <Textarea
                 placeholder="Optional note..."
@@ -418,7 +436,7 @@ const Transfers = () => {
             </Button>
             <Button
               onClick={handleNewTransferSubmit}
-              disabled={!newTransferItemId || !newTransferDestinationId || newTransferQuantity < 1}
+              disabled={!newTransferItemId || !newTransferDestinationId || !newTransferSourceOfFund || newTransferQuantity < 1}
             >
               Submit Transfer
             </Button>
