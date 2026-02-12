@@ -35,7 +35,7 @@ import { ArrowLeftRight, CheckCircle, XCircle, Clock, Eye, Building2, Send } fro
 import { TablePagination } from '@/components/ui/table-pagination';
 
 const SDO_SCHOOL = { id: 'sdo', name: 'Schools Division Office of City of Baliuag' };
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 const destinationSchools = schools.filter((s) => s.id !== 'sdo');
 
 const Transfers = () => {
@@ -234,7 +234,7 @@ const Transfers = () => {
               <TableHeader>
                 <TableRow className="table-header">
                   <TableHead>Ref. No.</TableHead>
-                  <TableHead>Date</TableHead>
+                  <TableHead className="whitespace-nowrap">Date</TableHead>
                   <TableHead>From</TableHead>
                   <TableHead>To</TableHead>
                   <TableHead>Items</TableHead>
@@ -314,30 +314,30 @@ const Transfers = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Reference No.</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Reference No.</p>
                   <p className="font-mono font-medium">{selectedTransfer.refNo}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Date</p>
                   <p>{new Date(selectedTransfer.date).toLocaleDateString('en-PH')}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">From</p>
+                  <p className="text-sm font-semibold text-muted-foreground">From</p>
                   <p className="font-medium">{selectedTransfer.schoolName}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">To</p>
+                  <p className="text-sm font-semibold text-muted-foreground">To</p>
                   <p className="font-medium">{selectedTransfer.targetSchoolName}</p>
                 </div>
               </div>
 
               <div>
-                <p className="text-sm text-muted-foreground mb-2">Status</p>
+                <p className="text-sm font-semibold text-muted-foreground mb-2">Status</p>
                 {getStatusBadge(selectedTransfer.status)}
               </div>
 
               <div>
-                <p className="text-sm text-muted-foreground mb-2">Items</p>
+                <p className="text-sm font-semibold text-muted-foreground mb-2">Items</p>
                 <div className="space-y-2">
                   {selectedTransfer.items.map((item, index) => (
                     <div
@@ -353,7 +353,7 @@ const Transfers = () => {
 
               {selectedTransfer.reason && (
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Reason</p>
+                  <p className="text-sm font-semibold text-muted-foreground mb-1">Reason</p>
                   <p className="text-sm p-2 rounded bg-muted">
                     {selectedTransfer.reason}
                   </p>

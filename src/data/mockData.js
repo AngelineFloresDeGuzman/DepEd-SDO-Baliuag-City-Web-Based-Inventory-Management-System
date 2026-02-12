@@ -84,6 +84,25 @@ export const items = [
   { id: "item030", code: "SPT-001", name: "Basketball, Size 6", category: "Sports Equipment", unit: "Piece", type: "Semi-Expendable", reorderLevel: 3, isActive: true },
 ];
 
+const sources = [
+  "Maintenance and Other Operating Expenses (MOOE)",
+  "Local School Board (LSB)/Local Government Unit (LGU)",
+  "Donation",
+  "Others",
+];
+
+const defaultUnitPrices = {
+  "Office Supplies": 50,
+  "ICT Equipment": 5000,
+  "Medical Supplies": 200,
+  "Cleaning Materials": 150,
+  "Personal Protective Equipment": 300,
+  "Electrical Equipment": 800,
+  "Furniture & Fixtures": 2000,
+  "Sports Equipment": 400,
+  "Other Supplies": 100,
+};
+
 export const generateInventory = (schoolId) => {
   const conditions = ["Good", "Good", "Good", "Damaged", "For Repair"];
   const today = new Date();
@@ -92,11 +111,16 @@ export const generateInventory = (schoolId) => {
     const daysAgo = Math.floor(Math.random() * 90) + 1;
     const dateAcquired = new Date(today);
     dateAcquired.setDate(dateAcquired.getDate() - daysAgo);
-    
+    const quantity = Math.floor(Math.random() * 50) + 1;
+    const unitPrice = (defaultUnitPrices[item.category] || 100) * (0.8 + Math.random() * 0.4);
+    const totalCost = Math.round(quantity * unitPrice);
     return {
       ...item,
       schoolId,
-      quantity: Math.floor(Math.random() * 50) + 1,
+      quantity,
+      unitPrice: Math.round(unitPrice * 100) / 100,
+      totalCost,
+      source: sources[Math.floor(Math.random() * sources.length)],
       condition: conditions[Math.floor(Math.random() * conditions.length)],
       dateAcquired: dateAcquired.toISOString().split("T")[0],
       lastUpdated: new Date(
@@ -258,9 +282,9 @@ export const barcodeToItemId = {
 
 // Raw / undistributed inventory — government-funded supplies at SDO warehouse, not yet distributed to schools
 export const rawInventoryInitial = [
-  { id: "raw001", itemId: "item001", code: "OS-001", name: "Bondpaper, A4, Ream", category: "Office Supplies", unit: "Ream", quantity: 120, unitPrice: 245.0, totalCost: 29400, dateReceived: "2024-01-15", source: "Government Procurement" },
-  { id: "raw002", itemId: "item003", code: "OS-003", name: "Ball Pen, Black, Pc", category: "Office Supplies", unit: "Piece", quantity: 500, unitPrice: 12.5, totalCost: 6250, dateReceived: "2024-01-18", source: "Government Procurement" },
-  { id: "raw003", itemId: "item013", code: "ICT-001", name: "Printer, Epson L121", category: "ICT Equipment", unit: "Unit", quantity: 5, unitPrice: 8995.0, totalCost: 44975, dateReceived: "2024-01-20", source: "Government Procurement" },
-  { id: "raw004", itemId: "item018", code: "MED-001", name: "Alcohol, 1 Gal", category: "Medical Supplies", unit: "Gallon", quantity: 30, unitPrice: 380.0, totalCost: 11400, dateReceived: "2024-01-22", source: "Government Procurement" },
-  { id: "raw005", itemId: "item028", code: "FUR-001", name: "Office Chair", category: "Furniture & Fixtures", unit: "Piece", quantity: 12, unitPrice: 2500.0, totalCost: 30000, dateReceived: "2024-01-25", source: "Government Procurement" },
+  { id: "raw001", itemId: "item001", code: "OS-001", name: "Bondpaper, A4, Ream", category: "Office Supplies", unit: "Ream", quantity: 120, unitPrice: 245.0, totalCost: 29400, dateReceived: "2024-01-15", source: "Maintenance and Other Operating Expenses (MOOE)" },
+  { id: "raw002", itemId: "item003", code: "OS-003", name: "Ball Pen, Black, Pc", category: "Office Supplies", unit: "Piece", quantity: 500, unitPrice: 12.5, totalCost: 6250, dateReceived: "2024-01-18", source: "Maintenance and Other Operating Expenses (MOOE)" },
+  { id: "raw003", itemId: "item013", code: "ICT-001", name: "Printer, Epson L121", category: "ICT Equipment", unit: "Unit", quantity: 5, unitPrice: 8995.0, totalCost: 44975, dateReceived: "2024-01-20", source: "Local School Board (LSB)/Local Government Unit (LGU)" },
+  { id: "raw004", itemId: "item018", code: "MED-001", name: "Alcohol, 1 Gal", category: "Medical Supplies", unit: "Gallon", quantity: 30, unitPrice: 380.0, totalCost: 11400, dateReceived: "2024-01-22", source: "Donation" },
+  { id: "raw005", itemId: "item028", code: "FUR-001", name: "Office Chair", category: "Furniture & Fixtures", unit: "Piece", quantity: 12, unitPrice: 2500.0, totalCost: 30000, dateReceived: "2024-01-25", source: "Others" },
 ];

@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { TablePagination } from '@/components/ui/table-pagination';
 
-const MODAL_PAGE_SIZE = 8;
+const MODAL_PAGE_SIZE = 10;
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -263,7 +263,7 @@ const Dashboard = () => {
                       <TableHead className="w-12">#</TableHead>
                       <TableHead>School Name</TableHead>
                       <TableHead>Level</TableHead>
-                      <TableHead>Last Updated</TableHead>
+                      <TableHead className="whitespace-nowrap">Last Updated</TableHead>
                       <TableHead className="text-right">Completeness Score</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -337,7 +337,7 @@ const Dashboard = () => {
                       <TableHead className="text-right">Quantity</TableHead>
                       <TableHead>Unit</TableHead>
                       <TableHead className="text-right">Reorder Level</TableHead>
-                      <TableHead>Last Updated</TableHead>
+                      <TableHead className="whitespace-nowrap">Last Updated</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -471,7 +471,7 @@ const Dashboard = () => {
                   <TableHeader>
                     <TableRow className="table-header">
                       <TableHead>Ref. No.</TableHead>
-                      <TableHead>Date</TableHead>
+                      <TableHead className="whitespace-nowrap">Date</TableHead>
                       <TableHead>From</TableHead>
                       <TableHead>To</TableHead>
                       <TableHead>Items</TableHead>

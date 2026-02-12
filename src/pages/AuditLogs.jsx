@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 import { TablePagination } from '@/components/ui/table-pagination';
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 const AuditLogs = () => {
   const { user } = useAuth();
@@ -264,27 +264,27 @@ const AuditLogs = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Timestamp</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Timestamp</p>
                   <p className="font-medium">
                     {new Date(selectedLog.timestamp).toLocaleString('en-PH')}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Action</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Action</p>
                   {getActionBadge(selectedLog.action)}
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">School</p>
+                  <p className="text-sm font-semibold text-muted-foreground">School</p>
                   <p className="font-medium">{selectedLog.schoolName}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">User</p>
+                  <p className="text-sm font-semibold text-muted-foreground">User</p>
                   <p className="font-medium">{selectedLog.userName}</p>
                 </div>
               </div>
 
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Details</p>
+                <p className="text-sm font-semibold text-muted-foreground mb-1">Details</p>
                 <p className="p-3 rounded bg-muted text-sm">{selectedLog.details}</p>
               </div>
 
@@ -292,7 +292,7 @@ const AuditLogs = () => {
                 <div className="grid grid-cols-2 gap-4">
                   {selectedLog.before && (
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Before</p>
+                      <p className="text-sm font-semibold text-muted-foreground mb-1">Before</p>
                       <pre className="p-3 rounded bg-destructive/10 text-xs overflow-auto">
                         {JSON.stringify(selectedLog.before, null, 2)}
                       </pre>
@@ -300,7 +300,7 @@ const AuditLogs = () => {
                   )}
                   {selectedLog.after && (
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">After</p>
+                      <p className="text-sm font-semibold text-muted-foreground mb-1">After</p>
                       <pre className="p-3 rounded bg-success/10 text-xs overflow-auto">
                         {JSON.stringify(selectedLog.after, null, 2)}
                       </pre>

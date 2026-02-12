@@ -22,7 +22,7 @@ export default function CameraScanDialog({ open, onOpenChange, onAddWithItem, it
   const [quantity, setQuantity] = useState(1);
   const [unitPrice, setUnitPrice] = useState('');
   const [dateReceived, setDateReceived] = useState(() => new Date().toISOString().split('T')[0]);
-  const [source, setSource] = useState('Government Procurement');
+  const [source, setSource] = useState('Maintenance and Other Operating Expenses (MOOE)');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -114,7 +114,7 @@ export default function CameraScanDialog({ open, onOpenChange, onAddWithItem, it
       unitPrice: price,
       totalCost: qty * price,
       dateReceived: dateReceived || new Date().toISOString().split('T')[0],
-      source: source || 'Government Procurement',
+      source: source || 'Maintenance and Other Operating Expenses (MOOE)',
     });
     onOpenChange(false);
   };
@@ -204,7 +204,7 @@ export default function CameraScanDialog({ open, onOpenChange, onAddWithItem, it
                   <Input
                     value={source}
                     onChange={(e) => setSource(e.target.value)}
-                    placeholder="e.g. Government Procurement"
+                    placeholder="e.g. MOOE, LSB/LGU, Donation, Others"
                   />
                 </div>
               </div>

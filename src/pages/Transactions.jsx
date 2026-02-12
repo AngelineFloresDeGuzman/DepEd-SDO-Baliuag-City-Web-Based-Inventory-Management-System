@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import { TablePagination } from '@/components/ui/table-pagination';
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 const Transactions = () => {
   const { user } = useAuth();
@@ -365,7 +365,7 @@ const TransactionTable = ({ transactions, getTypeBadge }) => {
           <TableHeader>
             <TableRow className="table-header">
               <TableHead>Ref. No.</TableHead>
-              <TableHead>Date</TableHead>
+              <TableHead className="whitespace-nowrap">Date</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Items</TableHead>
               <TableHead>Created By</TableHead>

@@ -30,7 +30,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { TablePagination } from '@/components/ui/table-pagination';
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 10;
 
 const Schools = () => {
   const navigate = useNavigate();
@@ -160,7 +160,7 @@ const Schools = () => {
                 <TableRow className="table-header">
                   <TableHead className="w-[40%]">School Name</TableHead>
                   <TableHead>Level</TableHead>
-                  <TableHead>Last Updated</TableHead>
+                  <TableHead className="whitespace-nowrap">Last Updated</TableHead>
                   <TableHead className="text-center">Completeness Score</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
