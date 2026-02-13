@@ -84,8 +84,6 @@ const Inventory = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [itemDeductions, setItemDeductions] = useState({});
   const [lastDeductionUpdate, setLastDeductionUpdate] = useState({});
-  const [rawItemDeductions, setRawItemDeductions] = useState({});
-  const [rawLastDeductionUpdate, setRawLastDeductionUpdate] = useState({});
   const [invPage, setInvPage] = useState(1);
   const [rawInvPage, setRawInvPage] = useState(1);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -530,31 +528,11 @@ const Inventory = () => {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{row.unit}</TableCell>
                           <TableCell className="text-right">{row.quantity}</TableCell>
-                          <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                            <Input
-                              type="text"
-                              inputMode="numeric"
-                              min={0}
-                              max={row.quantity}
-                              value={rawItemDeductions[row.id] || 0}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                const inputValue = e.target.value;
-                                let newValue = 0;
-                                if (inputValue !== '') {
-                                  const parsed = parseInt(inputValue, 10);
-                                  if (!isNaN(parsed)) {
-                                    newValue = Math.max(0, Math.min(row.quantity, parsed));
-                                  }
-                                }
-                                setRawItemDeductions((prev) => ({ ...prev, [row.id]: newValue }));
-                                setRawLastDeductionUpdate((prev) => ({ ...prev, [row.id]: new Date().toISOString() }));
-                              }}
-                              className="w-16 h-8 text-center"
-                            />
+                          <TableCell className="text-center">
+                            {Math.max(0, (row.initialQuantity ?? row.quantity) - row.quantity)}
                           </TableCell>
                           <TableCell className="text-center font-semibold">
-                            {row.quantity - (rawItemDeductions[row.id] || 0)}
+                            {row.quantity}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {row.dateReceived ? new Date(row.dateReceived).toLocaleDateString('en-PH') : '—'}
@@ -1090,11 +1068,17 @@ const Inventory = () => {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Deducted</p>
-                  <p className="text-sm">{rawItemDeductions[selectedRawItem.id] || 0}</p>
+                  <p className="text-sm">
+                    {Math.max(
+                      0,
+                      (selectedRawItem.initialQuantity ?? selectedRawItem.quantity) -
+                        selectedRawItem.quantity
+                    )}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Balance</p>
-                  <p className="text-sm">{selectedRawItem.quantity - (rawItemDeductions[selectedRawItem.id] || 0)}</p>
+                  <p className="text-sm">{selectedRawItem.quantity}</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Unit Price</p>

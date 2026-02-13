@@ -4,11 +4,31 @@ import { rawInventoryInitial } from '@/data/mockData';
 const RawInventoryContext = createContext(undefined);
 
 export const RawInventoryProvider = ({ children }) => {
-  const [rawInventory, setRawInventory] = useState(rawInventoryInitial);
+  // Attach an immutable baseline quantity so we can show "Deducted" in the SDO warehouse table
+  const [rawInventory, setRawInventory] = useState(
+    rawInventoryInitial.map((entry) => ({
+      ...entry,
+      initialQuantity:
+        typeof entry.initialQuantity === 'number' && entry.initialQuantity >= 0
+          ? entry.initialQuantity
+          : entry.quantity || 0,
+    }))
+  );
 
   const addRawEntry = useCallback((entry) => {
     const id = `raw${Date.now()}`;
-    setRawInventory((prev) => [...prev, { ...entry, id }]);
+    const quantity = entry.quantity || 0;
+    setRawInventory((prev) => [
+      ...prev,
+      {
+        ...entry,
+        id,
+        initialQuantity:
+          typeof entry.initialQuantity === 'number' && entry.initialQuantity >= 0
+            ? entry.initialQuantity
+            : quantity,
+      },
+    ]);
   }, []);
 
   const removeRawEntry = useCallback((id) => {
@@ -17,7 +37,20 @@ export const RawInventoryProvider = ({ children }) => {
 
   const updateRawEntry = useCallback((id, updates) => {
     setRawInventory((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, ...updates } : e))
+      prev.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              ...updates,
+              // Preserve the original baseline unless an explicit initialQuantity is provided
+              initialQuantity:
+                typeof (updates.initialQuantity ?? e.initialQuantity) === 'number' &&
+                (updates.initialQuantity ?? e.initialQuantity) >= 0
+                  ? updates.initialQuantity ?? e.initialQuantity
+                  : e.initialQuantity,
+            }
+          : e
+      )
     );
   }, []);
 

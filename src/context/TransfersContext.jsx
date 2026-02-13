@@ -14,10 +14,14 @@ export const TransfersProvider = ({ children }) => {
     setAddedTransfers((prev) => [...prev, { ...transfer }]);
   }, []);
 
-  const updateTransferStatus = useCallback((transferId, status) => {
+  const updateTransferStatus = useCallback((transferId, status, extraUpdates = {}) => {
     setAddedTransfers((prev) =>
-      prev.map((t) => (t.id === transferId ? { ...t, status } : t))
+      prev.map((t) => (t.id === transferId ? { ...t, status, ...extraUpdates } : t))
     );
+  }, []);
+
+  const removeTransfer = useCallback((transferId) => {
+    setAddedTransfers((prev) => prev.filter((t) => t.id === transferId ? false : true));
   }, []);
 
   return (
@@ -26,6 +30,7 @@ export const TransfersProvider = ({ children }) => {
         transfers: allTransfers,
         addTransfer,
         updateTransferStatus,
+        removeTransfer,
       }}
     >
       {children}
