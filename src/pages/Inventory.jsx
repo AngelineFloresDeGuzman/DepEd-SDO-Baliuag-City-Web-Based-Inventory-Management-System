@@ -488,31 +488,11 @@ const Inventory = () => {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{row.unit}</TableCell>
                           <TableCell className="text-right">{row.quantity}</TableCell>
-                          <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                            <Input
-                              type="text"
-                              inputMode="numeric"
-                              min={0}
-                              max={row.quantity}
-                              value={rawItemDeductions[row.id] || 0}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                const inputValue = e.target.value;
-                                let newValue = 0;
-                                if (inputValue !== '') {
-                                  const parsed = parseInt(inputValue, 10);
-                                  if (!isNaN(parsed)) {
-                                    newValue = Math.max(0, Math.min(row.quantity, parsed));
-                                  }
-                                }
-                                setRawItemDeductions((prev) => ({ ...prev, [row.id]: newValue }));
-                                setRawLastDeductionUpdate((prev) => ({ ...prev, [row.id]: new Date().toISOString() }));
-                              }}
-                              className="w-16 h-8 text-center"
-                            />
+                          <TableCell className="text-center">
+                            {Math.max(0, (row.initialQuantity ?? row.quantity) - row.quantity)}
                           </TableCell>
                           <TableCell className="text-center font-semibold">
-                            {row.quantity - (rawItemDeductions[row.id] || 0)}
+                            {row.quantity}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {row.dateReceived ? new Date(row.dateReceived).toLocaleDateString('en-PH') : '—'}
