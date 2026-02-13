@@ -61,6 +61,7 @@ import { Calendar } from '@/components/ui/calendar';
 import CameraScanDialog from '@/components/inventory/CameraScanDialog';
 import BarcodeScannerDialog from '@/components/inventory/BarcodeScannerDialog';
 import AddSchoolItemModal from '@/components/inventory/AddSchoolItemModal';
+import AddItemPurchasedModal from '@/components/inventory/AddItemPurchasedModal';
 import StockCardReport from '@/components/inventory/StockCardReport';
 import { TablePagination } from '@/components/ui/table-pagination';
 import html2pdf from 'html2pdf.js';
@@ -132,47 +133,6 @@ const Inventory = () => {
   const [showCameraScan, setShowCameraScan] = useState(false);
   const [showBarcodeScan, setShowBarcodeScan] = useState(false);
   const [selectedRawItem, setSelectedRawItem] = useState(null);
-  const [addRawItemId, setAddRawItemId] = useState('');
-  const [addRawQty, setAddRawQty] = useState(1);
-  const [addRawUnitPrice, setAddRawUnitPrice] = useState('');
-  const [addRawDate, setAddRawDate] = useState(new Date().toISOString().split('T')[0]);
-  const [addRawSource, setAddRawSource] = useState('Maintenance and Other Operating Expenses (MOOE)');
-
-  const addRawTotalCost = useMemo(() => {
-    const qty = Math.max(1, parseInt(addRawQty, 10) || 1);
-    const price = parseFloat(addRawUnitPrice) || 0;
-    return qty * price;
-  }, [addRawQty, addRawUnitPrice]);
-
-  const handleAddRawSubmit = () => {
-    const item = items.find((i) => i.id === addRawItemId);
-    if (!item || !addRawUnitPrice || Number(addRawUnitPrice) <= 0) return;
-    const qty = Math.max(1, parseInt(addRawQty, 10) || 1);
-    const price = parseFloat(addRawUnitPrice);
-    addRawEntry({
-      itemId: item.id,
-      code: item.code,
-      name: item.name,
-      category: item.category,
-      unit: item.unit,
-      quantity: qty,
-      unitPrice: price,
-      totalCost: qty * price,
-      dateReceived: addRawDate,
-      source: addRawSource,
-    });
-    addNotification({
-      title: 'Warehouse stock added',
-      message: `${qty}× ${item.name} added to SDO warehouse. Source: ${addRawSource}.`,
-      type: 'inventory',
-      forAdmin: true,
-    });
-    setShowAddRawDialog(false);
-    setAddRawItemId('');
-    setAddRawQty(1);
-    setAddRawUnitPrice('');
-    setAddRawDate(new Date().toISOString().split('T')[0]);
-  };
 
   const handleAddRawFromScan = (entry) => {
     addRawEntry(entry);
@@ -509,7 +469,7 @@ const Inventory = () => {
                         <TableHead className="text-right">Qty</TableHead>
                         <TableHead className="text-center">Deducted</TableHead>
                         <TableHead className="text-center">Balance</TableHead>
-                        <TableHead className="whitespace-nowrap">Date Acquired</TableHead>
+                        <TableHead className="whitespace-nowrap text-center">Date Acquired</TableHead>
                         <TableHead>Source</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -521,43 +481,45 @@ const Inventory = () => {
                           onClick={() => setSelectedRawItem(row)}
                         >
                           <TableCell className="font-mono text-sm">{row.code}</TableCell>
-                          <TableCell className="font-medium">{row.name}</TableCell>
+                          <TableCell>{row.name}</TableCell>
                           <TableCell className="text-sm">{row.category}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs whitespace-nowrap">
                               {items.find((i) => i.id === row.itemId)?.type || '—'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{row.unit}</TableCell>
-                          <TableCell className="text-right">{row.quantity}</TableCell>
+                          <TableCell className="text-center">{row.quantity}</TableCell>
                           <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                            <Input
-                              type="text"
-                              inputMode="numeric"
-                              min={0}
-                              max={row.quantity}
-                              value={rawItemDeductions[row.id] || 0}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                const inputValue = e.target.value;
-                                let newValue = 0;
-                                if (inputValue !== '') {
-                                  const parsed = parseInt(inputValue, 10);
-                                  if (!isNaN(parsed)) {
-                                    newValue = Math.max(0, Math.min(row.quantity, parsed));
+                            <div className="flex justify-center items-center">
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                min={0}
+                                max={row.quantity}
+                                value={rawItemDeductions[row.id] || 0}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  const inputValue = e.target.value;
+                                  let newValue = 0;
+                                  if (inputValue !== '') {
+                                    const parsed = parseInt(inputValue, 10);
+                                    if (!isNaN(parsed)) {
+                                      newValue = Math.max(0, Math.min(row.quantity, parsed));
+                                    }
                                   }
-                                }
-                                setRawItemDeductions((prev) => ({ ...prev, [row.id]: newValue }));
-                                setRawLastDeductionUpdate((prev) => ({ ...prev, [row.id]: new Date().toISOString() }));
-                              }}
-                              className="w-16 h-8 text-center"
-                            />
+                                  setRawItemDeductions((prev) => ({ ...prev, [row.id]: newValue }));
+                                  setRawLastDeductionUpdate((prev) => ({ ...prev, [row.id]: new Date().toISOString() }));
+                                }}
+                                className="w-16 h-8 text-center"
+                              />
+                            </div>
                           </TableCell>
-                          <TableCell className="text-center font-semibold">
-                            {row.quantity - (rawItemDeductions[row.id] || 0)}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {row.dateReceived ? new Date(row.dateReceived).toLocaleDateString('en-PH') : '—'}
+                          <TableCell className="text-center">{row.quantity - (rawItemDeductions[row.id] || 0)}</TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex justify-center items-center">
+                              {row.dateReceived ? new Date(row.dateReceived).toLocaleDateString('en-PH') : '—'}
+                            </div>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-[140px] truncate">
                             {row.source || '—'}
@@ -589,20 +551,20 @@ const Inventory = () => {
         {/* Actions Bar */}
         <div className="flex flex-row flex-nowrap items-center gap-3 overflow-x-auto">
             {/* Search */}
-            <div className="relative shrink-0">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search items..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-64"
+                className="pl-9 w-full"
               />
             </div>
 
             {/* School Filter (Admin only) */}
             {isAdmin && (
               <Select value={selectedSchool} onValueChange={setSelectedSchool}>
-                <SelectTrigger className="w-56">
+                <SelectTrigger className="w-96 text-left">
                   <SelectValue placeholder="Select school" />
                 </SelectTrigger>
                 <SelectContent>
@@ -825,7 +787,7 @@ const Inventory = () => {
                   <TableHead className="text-center">Qty</TableHead>
                   <TableHead className="text-center">Deducted</TableHead>
                   <TableHead className="text-center">Balance</TableHead>
-                  <TableHead className="whitespace-nowrap">Date Acquired</TableHead>
+                  <TableHead className="whitespace-nowrap text-center">Date Acquired</TableHead>
                   <TableHead>Source</TableHead>
                 </TableRow>
               </TableHeader>
@@ -854,55 +816,60 @@ const Inventory = () => {
                     )}
                     <TableCell className="text-sm">{item.category}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs whitespace-nowrap">
                         {item.type}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {item.unit}
                     </TableCell>
-                    <TableCell className="text-center font-semibold">
-                      {item.quantity}
-                    </TableCell>
+                    <TableCell className="text-center">{item.quantity}</TableCell>
                     <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        min={0}
-                        max={item.quantity}
-                        value={itemDeductions[`${item.schoolId}-${item.id}`] || 0}
-                        disabled={!item.source}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          const inputValue = e.target.value;
-                          let newValue = 0;
-                          
-                          if (inputValue === '') {
-                            newValue = 0;
-                          } else {
-                            const parsed = parseInt(inputValue, 10);
-                            if (!isNaN(parsed)) {
-                              newValue = Math.max(0, Math.min(item.quantity, parsed));
-                            }
-                          }
-                          
-                          setItemDeductions((prev) => ({
-                            ...prev,
-                            [`${item.schoolId}-${item.id}`]: newValue,
-                          }));
-                          setLastDeductionUpdate((prev) => ({
-                            ...prev,
-                            [`${item.schoolId}-${item.id}`]: new Date().toISOString(),
-                          }));
-                        }}
-                        className="w-16 h-8 text-center"
-                      />
+                      {selectedSchool === 'sdo' ? (
+                        <div className="flex justify-center items-center">
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            min={0}
+                            max={item.quantity}
+                            value={itemDeductions[`${item.schoolId}-${item.id}`] || 0}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const inputValue = e.target.value;
+                              let newValue = 0;
+                              
+                              if (inputValue === '') {
+                                newValue = 0;
+                              } else {
+                                const parsed = parseInt(inputValue, 10);
+                                if (!isNaN(parsed)) {
+                                  newValue = Math.max(0, Math.min(item.quantity, parsed));
+                                }
+                              }
+                              
+                              setItemDeductions((prev) => ({
+                                ...prev,
+                                [`${item.schoolId}-${item.id}`]: newValue,
+                              }));
+                              setLastDeductionUpdate((prev) => ({
+                                ...prev,
+                                [`${item.schoolId}-${item.id}`]: new Date().toISOString(),
+                              }));
+                            }}
+                            className="w-16 h-8 text-center"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-right flex justify-center items-center">
+                          {itemDeductions[`${item.schoolId}-${item.id}`] || 0}
+                        </span>
+                      )}
                     </TableCell>
-                    <TableCell className="text-center font-semibold">
-                      {item.quantity - (itemDeductions[`${item.schoolId}-${item.id}`] || 0)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {item.dateAcquired ? new Date(item.dateAcquired).toLocaleDateString('en-PH') : '—'}
+                    <TableCell className="text-center">{item.quantity - (itemDeductions[`${item.schoolId}-${item.id}`] || 0)}</TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex justify-center items-center">
+                        {item.dateAcquired ? new Date(item.dateAcquired).toLocaleDateString('en-PH') : '—'}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[140px] truncate">
                       {item.source || '—'}
@@ -931,124 +898,34 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* Add Newly Purchased Dialog - fields align with Inventory table & Item Details modal */}
-      <Dialog open={showAddRawDialog} onOpenChange={setShowAddRawDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-display">Add Newly Purchased Item</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Record government-funded supplies before distribution. Fields match Inventory table and details modal.
-          </p>
-          <div className="space-y-4">
-            <div>
-              <Label className="font-semibold">Item *</Label>
-              <Select value={addRawItemId} onValueChange={setAddRawItemId}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select item" />
-                </SelectTrigger>
-                <SelectContent>
-                  {items.map((i) => (
-                    <SelectItem key={i.id} value={i.id}>
-                      {i.code} — {i.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {addRawItemId && (() => {
-              const sel = items.find((i) => i.id === addRawItemId);
-              if (!sel) return null;
-              return (
-                <div className="grid grid-cols-2 gap-4 rounded-lg border border-border p-4 bg-muted/30">
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground">Code</p>
-                    <p className="text-sm font-mono">{sel.code}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground">Item Name</p>
-                    <p className="text-sm">{sel.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground">Category</p>
-                    <p className="text-sm">{sel.category}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground">Type</p>
-                    <Badge variant="outline" className="text-xs">{sel.type}</Badge>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground">Unit</p>
-                    <p className="text-sm">{sel.unit}</p>
-                  </div>
-                </div>
-              );
-            })()}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="font-semibold">Quantity *</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={addRawQty}
-                  onChange={(e) => setAddRawQty(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label className="font-semibold">Unit Price (₱) *</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  placeholder="0.00"
-                  value={addRawUnitPrice}
-                  onChange={(e) => setAddRawUnitPrice(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-            </div>
-            <div>
-              <Label className="font-semibold">Total Cost (₱)</Label>
-              <div className="mt-1 flex items-center gap-2 p-3 rounded-lg bg-muted">
-                <Banknote className="w-5 h-5 text-primary" />
-                <span className="font-semibold">
-                  ₱{addRawTotalCost.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-            <div>
-              <Label className="font-semibold">Date Acquired</Label>
-              <Input
-                type="date"
-                value={addRawDate}
-                onChange={(e) => setAddRawDate(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="font-semibold">Source</Label>
-              <Input
-                placeholder="e.g. MOOE, LSB/LGU, Donation, Others"
-                value={addRawSource}
-                onChange={(e) => setAddRawSource(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddRawDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAddRawSubmit}
-              disabled={!addRawItemId || !addRawUnitPrice || Number(addRawUnitPrice) <= 0}
-            >
-              Add to Warehouse
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Add Item Purchased Modal */}
+      <AddItemPurchasedModal
+        isOpen={showAddRawDialog}
+        onClose={() => setShowAddRawDialog(false)}
+        onSubmit={(data) => {
+          addRawEntry({
+            itemId: data.itemId,
+            code: data.itemCode,
+            name: data.itemName,
+            category: data.category,
+            unit: data.unit,
+            quantity: data.quantity,
+            unitPrice: data.unitPrice,
+            totalCost: data.totalCost,
+            deducted: data.deducted,
+            balance: data.balance,
+            dateReceived: data.dateAcquired,
+            source: data.source,
+            image: data.image
+          });
+          addNotification({
+            title: 'Warehouse stock added',
+            message: `${data.quantity}× ${data.itemName} added to SDO warehouse. Source: ${data.source}.`,
+            type: 'inventory',
+            forAdmin: true,
+          });
+        }}
+      />
 
       {/* SDO Warehouse Item Detail Dialog */}
       <Dialog open={!!selectedRawItem} onOpenChange={() => setSelectedRawItem(null)}>
@@ -1076,7 +953,7 @@ const Inventory = () => {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Type</p>
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs whitespace-nowrap">
                     {items.find((i) => i.id === selectedRawItem.itemId)?.type || '—'}
                   </Badge>
                 </div>
@@ -1176,7 +1053,7 @@ const Inventory = () => {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Type</p>
-                  <Badge variant="outline" className="text-xs">{selectedItem.type}</Badge>
+                  <Badge variant="outline" className="text-xs whitespace-nowrap">{selectedItem.type}</Badge>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Unit</p>
