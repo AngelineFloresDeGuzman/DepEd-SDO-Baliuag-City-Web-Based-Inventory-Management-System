@@ -516,7 +516,7 @@ const Inventory = () => {
                           <TableCell className="text-right">{row.quantity}</TableCell>
                           <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                             <Input
-                              type="number"
+                              type="text"
                               inputMode="numeric"
                               min={0}
                               max={row.quantity}
@@ -534,11 +534,11 @@ const Inventory = () => {
                                 setRawItemDeductions((prev) => ({ ...prev, [row.id]: newValue }));
                                 setRawLastDeductionUpdate((prev) => ({ ...prev, [row.id]: new Date().toISOString() }));
                               }}
-                              className="w-16 h-8 text-center mx-auto block"
+                              className="w-16 h-8 text-center"
                             />
                           </TableCell>
                           <TableCell className="text-center font-semibold">
-                            {row.quantity - (rawItemDeductions[row.id] || 0)}
+                            {row.quantity}
                           </TableCell>
                           <TableCell className="text-center text-sm text-muted-foreground">
                             {row.dateReceived ? new Date(row.dateReceived).toLocaleDateString('en-PH') : '—'}
