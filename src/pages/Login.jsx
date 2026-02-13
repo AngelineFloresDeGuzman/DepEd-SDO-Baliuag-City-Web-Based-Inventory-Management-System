@@ -39,8 +39,23 @@ const Login = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
+      {/* Video Background */}
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+      >
+        <source src="/background.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+      
+      {/* Overlay for better readability */}
+      <div className="absolute inset-0 bg-black/30"></div>
+      
+      <div className="w-full max-w-md relative z-10">
         {/* Logo Card */}
         <div className="bg-card rounded-t-xl border border-border border-b-0 p-6 text-center">
           <img src={logo} alt="DepEd Logo" className="w-24 h-24 mx-auto mb-4" />
