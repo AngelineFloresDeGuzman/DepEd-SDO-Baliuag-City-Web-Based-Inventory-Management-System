@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Search } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -17,9 +18,27 @@ import { cn } from '@/lib/utils';
 
 const Header = ({ title, subtitle }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { getForUser, unreadCountForUser, markAsRead, markAllAsRead } = useNotifications();
   const userNotifications = getForUser(user);
   const unreadCount = unreadCountForUser(user);
+
+  const handleNotificationClick = (n) => {
+    markAsRead(n.id);
+    if (n.transferId) {
+      navigate('/transfers', { state: { openTransferId: n.transferId } });
+    } else if (n.type === 'inventory') {
+      navigate('/inventory');
+    } else if (n.type === 'surplus') {
+      navigate('/resource-hub');
+    } else if (n.type === 'request') {
+      navigate('/transfers', { state: { openTransferId: n.transferId } });
+    } else if (n.type === 'transfer') {
+      navigate('/transfers', { state: { openTransferId: n.transferId } });
+    } else {
+      navigate('/dashboard');
+    }
+  };
 
   return (
     <header className="bg-card border-b border-border px-6 py-4">
@@ -88,7 +107,7 @@ const Header = ({ title, subtitle }) => {
                       )}
                       onSelect={(e) => {
                         e.preventDefault();
-                        markAsRead(n.id);
+                        handleNotificationClick(n);
                       }}
                     >
                       <span className="font-medium text-sm">{n.title}</span>

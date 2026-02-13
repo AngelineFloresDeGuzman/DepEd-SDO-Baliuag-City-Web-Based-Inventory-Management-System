@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useTransfers } from '@/context/TransfersContext';
 import { useRawInventory } from '@/context/RawInventoryContext';
@@ -42,6 +43,8 @@ const destinationSchools = schools.filter((s) => s.id !== 'sdo');
 
 const Transfers = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { transfers: allTransfers, addTransfer, updateTransferStatus, removeTransfer } = useTransfers();
   const { rawInventory, updateRawEntry } = useRawInventory();
   const { addToSchoolInventory } = useSchoolInventory();
@@ -52,6 +55,17 @@ const Transfers = () => {
   const [selectedTransfer, setSelectedTransfer] = useState(null);
 
   const transfers = allTransfers;
+
+  // Open specific transfer when navigated from notification click
+  useEffect(() => {
+    const openTransferId = location.state?.openTransferId;
+    if (!openTransferId || allTransfers.length === 0) return;
+    const transfer = allTransfers.find((t) => t.id === openTransferId);
+    if (transfer) {
+      setSelectedTransfer(transfer);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state?.openTransferId, allTransfers, navigate, location.pathname]);
 
   // Prototype: create transfer (admin)
   const [showNewTransferModal, setShowNewTransferModal] = useState(false);
