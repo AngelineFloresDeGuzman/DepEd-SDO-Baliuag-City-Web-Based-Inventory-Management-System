@@ -210,6 +210,33 @@
   .border-border {
     border-color: hsl(var(--border));
   }
+
+  /* Auto-adjust font size for truncated table cells (excluding school/source) */
+  .table-cell-auto-fit {
+    @apply overflow-hidden whitespace-nowrap;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .table-cell-auto-fit[data-truncated="true"] {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .table-cell-auto-fit[data-truncated="true"][data-very-long="true"] {
+    font-size: 0.625rem;
+    line-height: 0.875rem;
+  }
+
+  /* Multi-line cells for school and source columns */
+  .table-cell-wrap {
+    @apply overflow-visible;
+    white-space: normal;
+    word-wrap: break-word;
+    line-height: 1.25rem;
+    min-width: 120px;
+    max-width: 200px;
+  }
 }
 
 /* Inventory Report print styles */

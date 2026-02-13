@@ -37,6 +37,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { useTruncatedText } from '@/hooks/useTruncatedText';
 
 import {
   Search,
@@ -58,12 +59,12 @@ import {
   FileText,
 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
-import CameraScanDialog from '@/components/inventory/CameraScanDialog';
-import BarcodeScannerDialog from '@/components/inventory/BarcodeScannerDialog';
 import AddSchoolItemModal from '@/components/inventory/AddSchoolItemModal';
 import AddItemPurchasedModal from '@/components/inventory/AddItemPurchasedModal';
 import StockCardReport from '@/components/inventory/StockCardReport';
 import { TablePagination } from '@/components/ui/table-pagination';
+import TableCellAutoFit from '@/components/ui/TableCellAutoFit';
+import TableCellWrap from '@/components/ui/TableCellWrap';
 import html2pdf from 'html2pdf.js';
 
 const INV_PAGE_SIZE = 10;
@@ -85,6 +86,8 @@ const Inventory = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [itemDeductions, setItemDeductions] = useState({});
   const [lastDeductionUpdate, setLastDeductionUpdate] = useState({});
+  const [rawItemDeductions, setRawItemDeductions] = useState({});
+  const [rawLastDeductionUpdate, setRawLastDeductionUpdate] = useState({});
   const [invPage, setInvPage] = useState(1);
   const [rawInvPage, setRawInvPage] = useState(1);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -95,6 +98,8 @@ const Inventory = () => {
   const [endDate, setEndDate] = useState('');
   const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
   const [activeDateField, setActiveDateField] = useState(null); // 'start' | 'end' | null
+  const [hoveredDate, setHoveredDate] = useState(null);
+  const [selectedDates, setSelectedDates] = useState(new Set());
   const dateRangeRef = useRef(null);
   const reportRef = useRef(null);
 
@@ -126,21 +131,9 @@ const Inventory = () => {
   const [showAddSchoolItemModal, setShowAddSchoolItemModal] = useState(false);
   const [addSuccess, setAddSuccess] = useState(false);
 
-  // SDO Warehouse: add newly purchased / scan
+  // SDO Warehouse: add newly purchased
   const [showAddRawDialog, setShowAddRawDialog] = useState(false);
-  const [showCameraScan, setShowCameraScan] = useState(false);
-  const [showBarcodeScan, setShowBarcodeScan] = useState(false);
   const [selectedRawItem, setSelectedRawItem] = useState(null);
-
-  const handleAddRawFromScan = (entry) => {
-    addRawEntry(entry);
-    addNotification({
-      title: 'Warehouse stock added (scan)',
-      message: `${entry.quantity}× ${entry.name} added to SDO warehouse via camera/barcode scan.`,
-      type: 'inventory',
-      forAdmin: true,
-    });
-  };
 
   const handleAddSchoolItem = (entry) => {
     if (!user?.schoolId) return;
@@ -204,6 +197,27 @@ const Inventory = () => {
       });
       return [...baseInventory, ...schoolAdditions];
     }
+    if (selectedSchool === 'sdo') {
+      // Show SDO-PSU warehouse data when SDO is selected
+      return rawInventory.map((item) => {
+        const baseItem = items.find((i) => i.id === item.itemId);
+        return {
+          ...item,
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          category: baseItem?.category || '',
+          type: baseItem?.type || '',
+          unit: baseItem?.unit || '',
+          quantity: item.quantity,
+          schoolId: 'sdo',
+          schoolName: 'SDO Warehouse',
+          source: item.source,
+          dateAcquired: item.dateReceived, // Map dateReceived to dateAcquired for consistency
+          reorderLevel: baseItem?.reorderLevel || 0,
+        };
+      });
+    }
     const schoolName = schools.find((s) => s.id === selectedSchool)?.name || '';
     baseInventory = generateInventory(selectedSchool).map((item) => {
       const override = getConditionOverride(selectedSchool, item.id);
@@ -245,6 +259,22 @@ const Inventory = () => {
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const formatDateRangeDisplay = (startDate, endDate) => {
+    if (!startDate || !endDate) return '';
+    const start = parseDateStringToLocalDate(startDate);
+    const end = parseDateStringToLocalDate(endDate);
+    
+    // If same month and year, show as "Feb 2-25, 2026"
+    if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
+      const month = start.toLocaleDateString('en-PH', { month: 'short' });
+      const year = start.getFullYear();
+      return `${month} ${start.getDate()}-${end.getDate()}, ${year}`;
+    }
+    
+    // Otherwise show full format
+    return `${formatDateDisplay(startDate)} - ${formatDateDisplay(endDate)}`;
   };
 
   // Date filter logic
@@ -346,7 +376,7 @@ const Inventory = () => {
     if (dateFilterType === 'yearly') parts.push('Date: This Year');
     else if (dateFilterType === 'monthly') parts.push('Date: This Month');
     else if (dateFilterType === 'range' && startDate && endDate) {
-      parts.push(`Date: ${formatDateDisplay(startDate)} – ${formatDateDisplay(endDate)}`);
+      parts.push(`Date: ${formatDateRangeDisplay(startDate, endDate)}`);
     }
     return parts.length > 0 ? parts.join(' • ') : 'No filters applied (showing all)';
   };
@@ -431,10 +461,10 @@ const Inventory = () => {
                   </div>
                   <div>
                     <h2 className="text-lg font-display font-semibold text-sidebar-foreground">
-                      SDO Warehouse — Property and Supply Unit
+                      SDO - Property and Supply Unit
                     </h2>
                     <p className="text-sm text-sidebar-foreground/80">
-                      Government-funded supplies not yet distributed to schools. Add newly purchased items, scan with camera (AI), or use barcode scanner.
+                      Government-funded supplies not yet distributed to schools. Add newly purchased items or use barcode scanner.
                     </p>
                   </div>
                 </div>
@@ -444,14 +474,10 @@ const Inventory = () => {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="px-6 pt-4 pb-4 space-y-4 bg-card">
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => setShowAddRawDialog(true)}>
+                <div className="flex flex-wrap gap-2 justify-end">
+                  <Button onClick={() => setShowAddRawDialog(true)} className="bg-yellow-400 hover:bg-yellow-500 text-black">
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Newly Purchased
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowCameraScan(true)}>
-                    <Camera className="w-4 h-4 mr-2" />
-                    Scan with Camera (AI)
+                    Add Item
                   </Button>
                 </div>
 
@@ -490,7 +516,7 @@ const Inventory = () => {
                           <TableCell className="text-right">{row.quantity}</TableCell>
                           <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                             <Input
-                              type="text"
+                              type="number"
                               inputMode="numeric"
                               min={0}
                               max={row.quantity}
@@ -508,18 +534,18 @@ const Inventory = () => {
                                 setRawItemDeductions((prev) => ({ ...prev, [row.id]: newValue }));
                                 setRawLastDeductionUpdate((prev) => ({ ...prev, [row.id]: new Date().toISOString() }));
                               }}
-                              className="w-16 h-8 text-center"
+                              className="w-16 h-8 text-center mx-auto block"
                             />
                           </TableCell>
                           <TableCell className="text-center font-semibold">
                             {row.quantity - (rawItemDeductions[row.id] || 0)}
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
+                          <TableCell className="text-center text-sm text-muted-foreground">
                             {row.dateReceived ? new Date(row.dateReceived).toLocaleDateString('en-PH') : '—'}
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[140px] truncate">
+                          <TableCellWrap className="text-sm text-muted-foreground">
                             {row.source || '—'}
-                          </TableCell>
+                          </TableCellWrap>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -545,7 +571,7 @@ const Inventory = () => {
         )}
 
         {/* Actions Bar */}
-        <div className="flex flex-row flex-nowrap items-center gap-3 overflow-x-auto">
+        <div className={`flex flex-row flex-nowrap items-center gap-3 ${isDateRangeOpen ? '' : 'overflow-x-auto'}`}>
             {/* Search */}
             <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -553,14 +579,14 @@ const Inventory = () => {
                 placeholder="Search items..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-full"
+                className="pl-9 w-full bg-blue-50 border-blue-200 focus:border-blue-400 focus:ring-blue-200"
               />
             </div>
 
             {/* School Filter (Admin only) */}
             {isAdmin && (
               <Select value={selectedSchool} onValueChange={setSelectedSchool}>
-                <SelectTrigger className="w-96 text-left">
+                <SelectTrigger className="w-96 text-left bg-blue-50 border-blue-200 focus:border-blue-400 focus:ring-blue-200">
                   <SelectValue placeholder="Select school" />
                 </SelectTrigger>
                 <SelectContent>
@@ -576,7 +602,7 @@ const Inventory = () => {
 
             {/* Category Filter */}
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-44">
+              <SelectTrigger className="w-44 bg-blue-50 border-blue-200 focus:border-blue-400 focus:ring-blue-200">
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
@@ -592,7 +618,7 @@ const Inventory = () => {
 
             {/* Type Filter */}
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-36">
+              <SelectTrigger className="w-36 bg-blue-50 border-blue-200 focus:border-blue-400 focus:ring-blue-200">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
@@ -603,7 +629,7 @@ const Inventory = () => {
             </Select>
 
             {/* Date Filter with Custom Range Dropdown */}
-            <div className="relative inline-block" ref={dateRangeRef}>
+            <div className="relative inline-block" style={{ zIndex: isDateRangeOpen ? 9999 : 'auto' }} ref={dateRangeRef}>
               <Select
                 value={dateFilterType}
                 onValueChange={(value) => {
@@ -629,7 +655,7 @@ const Inventory = () => {
                 }}
               >
                 <SelectTrigger
-                  className="w-44 md:w-52"
+                  className="w-44 md:w-52 bg-blue-50 border-blue-200 focus:border-blue-400 focus:ring-blue-200"
                   onClick={() => {
                     if (dateFilterType === 'range') {
                       setIsDateRangeOpen(true);
@@ -640,7 +666,7 @@ const Inventory = () => {
                 >
                   {dateFilterType === 'range' && startDate && endDate ? (
                     <span className="text-sm">
-                      {formatDateDisplay(startDate)} - {formatDateDisplay(endDate)}
+                      {formatDateRangeDisplay(startDate, endDate)}
                     </span>
                   ) : (
                     <SelectValue placeholder="Date Filter" />
@@ -656,7 +682,13 @@ const Inventory = () => {
 
               {/* Date Range Float Panel */}
               {dateFilterType === 'range' && isDateRangeOpen && (
-                <div className="absolute top-full left-0 mt-2 w-[320px] bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50">
+                <div className="absolute z-[9999] bg-white border border-blue-200 rounded-lg shadow-2xl p-4"
+                     style={{
+                       top: '100%',
+                       left: '0',
+                       marginTop: '4px',
+                       width: '320px'
+                     }}>
                   <div className="space-y-3">
                     <div className="space-y-2">
                       <Label htmlFor="start-date">From</Label>
@@ -694,6 +726,28 @@ const Inventory = () => {
                               setActiveDateField('end');
                             }}
                             initialFocus
+                            className="[&_*]:bg-white [&_*]:text-black [&_*]:border-gray-200 [&_rdp]:bg-yellow-100 [&_rdp]:border-yellow-400 [&_rdp]:text-black"
+                            classNames={{
+                              day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-yellow-200 hover:text-black",
+                              day_selected: "bg-yellow-400 text-black hover:bg-yellow-400 hover:text-black focus:bg-yellow-400 focus:text-black",
+                              day_today: "bg-white text-black border-blue-400 border",
+                              day_outside: "text-muted-foreground opacity-50 aria-selected:bg-yellow-200/50 aria-selected:text-muted-foreground aria-selected:opacity-30"
+                            }}
+                            modifiers={{
+                              selected: Array.from(selectedDates).map(dateStr => parseDateStringToLocalDate(dateStr))
+                            }}
+                            onDayClick={(date) => {
+                              const dateStr = toISODateString(date);
+                              setSelectedDates(prev => {
+                                const newSet = new Set(prev);
+                                if (newSet.has(dateStr)) {
+                                  newSet.delete(dateStr);
+                                } else {
+                                  newSet.add(dateStr);
+                                }
+                                return newSet;
+                              });
+                            }}
                           />
                         </div>
                       )}
@@ -731,6 +785,28 @@ const Inventory = () => {
                               setIsDateRangeOpen(false);
                             }}
                             initialFocus
+                            className="[&_*]:bg-white [&_*]:text-black [&_*]:border-gray-200 [&_rdp]:bg-yellow-100 [&_rdp]:border-yellow-400 [&_rdp]:text-black"
+                            classNames={{
+                              day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-yellow-200 hover:text-black",
+                              day_selected: "bg-yellow-400 text-black hover:bg-yellow-400 hover:text-black focus:bg-yellow-400 focus:text-black",
+                              day_today: "bg-white text-black border-blue-400 border",
+                              day_outside: "text-muted-foreground opacity-50 aria-selected:bg-yellow-200/50 aria-selected:text-muted-foreground aria-selected:opacity-30"
+                            }}
+                            modifiers={{
+                              selected: Array.from(selectedDates).map(dateStr => parseDateStringToLocalDate(dateStr))
+                            }}
+                            onDayClick={(date) => {
+                              const dateStr = toISODateString(date);
+                              setSelectedDates(prev => {
+                                const newSet = new Set(prev);
+                                if (newSet.has(dateStr)) {
+                                  newSet.delete(dateStr);
+                                } else {
+                                  newSet.add(dateStr);
+                                }
+                                return newSet;
+                              });
+                            }}
                           />
                         </div>
                       )}
@@ -806,9 +882,9 @@ const Inventory = () => {
                       </div>
                     </TableCell>
                     {selectedSchool === 'all' && (
-                      <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                      <TableCellWrap className="text-sm text-muted-foreground">
                         {item.schoolName}
-                      </TableCell>
+                      </TableCellWrap>
                     )}
                     <TableCell className="text-sm">{item.category}</TableCell>
                     <TableCell>
@@ -824,7 +900,7 @@ const Inventory = () => {
                       {selectedSchool === 'sdo' ? (
                         <div className="flex justify-center items-center">
                           <Input
-                            type="text"
+                            type="number"
                             inputMode="numeric"
                             min={0}
                             max={item.quantity}
@@ -833,7 +909,6 @@ const Inventory = () => {
                               e.stopPropagation();
                               const inputValue = e.target.value;
                               let newValue = 0;
-                              
                               if (inputValue === '') {
                                 newValue = 0;
                               } else {
@@ -867,9 +942,9 @@ const Inventory = () => {
                         {item.dateAcquired ? new Date(item.dateAcquired).toLocaleDateString('en-PH') : '—'}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[140px] truncate">
+                    <TableCellWrap className="text-sm text-muted-foreground">
                       {item.source || '—'}
-                    </TableCell>
+                    </TableCellWrap>
                   </TableRow>
                 ))}
               </TableBody>
@@ -1007,24 +1082,31 @@ const Inventory = () => {
                   <p className="text-sm font-semibold text-muted-foreground">Source</p>
                   <p className="text-sm">{selectedRawItem.source || '—'}</p>
                 </div>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Last Updated</p>
+                  <p className="text-sm">
+                    {(() => {
+                      const dateValue = rawLastDeductionUpdate[selectedRawItem.id] || selectedRawItem.lastUpdated;
+                      if (!dateValue) return '—';
+                      try {
+                        return new Date(dateValue).toLocaleDateString('en-PH', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        });
+                      } catch {
+                        return '—';
+                      }
+                    })()}
+                  </p>
+                </div>
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
-
-      <CameraScanDialog
-        open={showCameraScan}
-        onOpenChange={setShowCameraScan}
-        onAddWithItem={handleAddRawFromScan}
-        items={items}
-      />
-      <BarcodeScannerDialog
-        open={showBarcodeScan}
-        onOpenChange={setShowBarcodeScan}
-        onAddWithItem={handleAddRawFromScan}
-        items={items}
-      />
 
       {/* Item Detail Dialog */}
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
@@ -1112,15 +1194,22 @@ const Inventory = () => {
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Last Updated</p>
                   <p className="text-sm">
-                    {new Date(
-                      lastDeductionUpdate[`${selectedItem.schoolId}-${selectedItem.id}`] || selectedItem.lastUpdated
-                    ).toLocaleDateString('en-PH', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {(() => {
+                      const dateValue = lastDeductionUpdate[`${selectedItem.schoolId}-${selectedItem.id}`] || selectedItem.lastUpdated;
+                      if (!dateValue) return '—';
+                      try {
+                        return new Date(dateValue).toLocaleDateString('en-PH', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        });
+                      } catch {
+                        return '—';
+                      }
+
+})()}
                   </p>
                 </div>
               </div>
@@ -1158,7 +1247,7 @@ const Inventory = () => {
             </div>
           </div>
           <DialogFooter className="print:hidden flex-shrink-0">
-            <Button variant="outline" onClick={() => setShowReportModal(false)}>
+            <Button variant="outline" className="bg-white hover:bg-gray-100 text-gray-900 border-gray-300" onClick={() => setShowReportModal(false)}>
               Close
             </Button>
             <Button
@@ -1170,7 +1259,12 @@ const Inventory = () => {
               <Download className="w-4 h-4 mr-2" />
               Export Report
             </Button>
-            <Button onClick={handlePrintReport} disabled={filteredInventory.length === 0}>
+            <Button 
+              size="sm"
+              className="bg-yellow-400 hover:bg-yellow-500 text-black"
+              onClick={handlePrintReport} 
+              disabled={filteredInventory.length === 0}
+            >
               <Printer className="w-4 h-4 mr-2" />
               Print Report
             </Button>

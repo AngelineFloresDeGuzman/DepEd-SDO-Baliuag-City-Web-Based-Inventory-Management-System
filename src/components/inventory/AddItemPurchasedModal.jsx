@@ -17,7 +17,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Camera, Upload, X } from 'lucide-react';
+import { Camera, Upload, X, Scan } from 'lucide-react';
 import { items, categories } from '@/data/mockData';
 
 const AddItemPurchasedModal = ({ isOpen, onClose, onSubmit }) => {
@@ -168,180 +168,40 @@ const AddItemPurchasedModal = ({ isOpen, onClose, onSubmit }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Item Purchased</DialogTitle>
+          <DialogTitle>Add Item</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Item Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="itemSelect">Select Item *</Label>
-            <Select onValueChange={handleItemSelect} value={formData.itemId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Search and select an item" />
-              </SelectTrigger>
-              <SelectContent>
-                {items.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.code} - {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.itemId && <p className="text-sm text-destructive">{errors.itemId}</p>}
-          </div>
-
-          {/* Item Details Row */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Item Code (Read-only) */}
-            <div className="space-y-2">
-              <Label htmlFor="itemCode">Item Code</Label>
-              <Input
-                id="itemCode"
-                value={formData.itemCode}
-                readOnly
-                className="bg-muted"
-              />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-4">
+          {/* Image Section - Left Side */}
+          <div className="lg:col-span-1 h-full flex flex-col">
+            <Label className="block mb-3">Item Image</Label>
+            <div className="flex-grow flex flex-col justify-center items-center space-y-4">
+              {formData.imagePreview ? (
+                <div className="relative w-full h-full">
+                  <img
+                    src={formData.imagePreview}
+                    alt="Item preview"
+                    className="w-full h-full object-cover rounded-lg border"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                    onClick={removeImage}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex-grow w-full border-2 border-dashed border-muted-foreground/25 rounded-lg flex items-center justify-center">
+                  <Camera className="w-10 h-10 text-muted-foreground/50" />
+                </div>
+              )}
             </div>
-
-            {/* Category (Read-only) */}
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Input
-                id="category"
-                value={formData.category}
-                readOnly
-                className="bg-muted"
-              />
-            </div>
-          </div>
-
-          {/* Item Name (Read-only) */}
-          <div className="space-y-2">
-            <Label htmlFor="itemName">Item Name</Label>
-            <Input
-              id="itemName"
-              value={formData.itemName}
-              readOnly
-              className="bg-muted"
-            />
-          </div>
-
-          {/* Type and Unit Row */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Type (Read-only) */}
-            <div className="space-y-2">
-              <Label htmlFor="type">Type</Label>
-              <Input
-                id="type"
-                value={formData.type}
-                readOnly
-                className="bg-muted"
-              />
-            </div>
-
-            {/* Unit (Read-only) */}
-            <div className="space-y-2">
-              <Label htmlFor="unit">Unit</Label>
-              <Input
-                id="unit"
-                value={formData.unit}
-                readOnly
-                className="bg-muted"
-              />
-            </div>
-          </div>
-
-          {/* Quantity and Unit Price Row */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Quantity */}
-            <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity *</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="1"
-                value={formData.quantity}
-                onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
-                placeholder="Enter quantity"
-              />
-              {errors.quantity && <p className="text-sm text-destructive">{errors.quantity}</p>}
-            </div>
-
-            {/* Unit Price */}
-            <div className="space-y-2">
-              <Label htmlFor="unitPrice">Unit Price *</Label>
-              <Input
-                id="unitPrice"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.unitPrice}
-                onChange={(e) => setFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
-                placeholder="Enter unit price"
-              />
-              {errors.unitPrice && <p className="text-sm text-destructive">{errors.unitPrice}</p>}
-            </div>
-          </div>
-
-          {/* Total Cost (Calculated) */}
-          <div className="space-y-2">
-            <Label htmlFor="totalCost">Total Cost</Label>
-            <Input
-              id="totalCost"
-              value={formData.totalCost}
-              readOnly
-              className="bg-muted"
-            />
-          </div>
-
-          {/* Source */}
-          <div className="space-y-2">
-            <Label htmlFor="source">Source *</Label>
-            <Select onValueChange={(value) => setFormData(prev => ({ ...prev, source: value }))} value={formData.source}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select source" />
-              </SelectTrigger>
-              <SelectContent>
-                {sources.map((source) => (
-                  <SelectItem key={source} value={source}>
-                    {source}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.source && <p className="text-sm text-destructive">{errors.source}</p>}
-          </div>
-        </div>
-
-        {/* Image Upload */}
-        <div className="space-y-4 pt-4 border-t">
-          <Label>Item Image (Optional)</Label>
-          <div className="flex items-center gap-4">
-            {formData.imagePreview ? (
-              <div className="relative">
-                <img
-                  src={formData.imagePreview}
-                  alt="Item preview"
-                  className="w-24 h-24 object-cover rounded-lg border"
-                />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                  onClick={removeImage}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ) : (
-              <div className="w-24 h-24 border-2 border-dashed border-muted-foreground/25 rounded-lg flex items-center justify-center">
-                <Camera className="w-8 h-8 text-muted-foreground/50" />
-              </div>
-            )}
-            <div className="flex-1">
+            <div className="space-y-3 mt-4">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -351,26 +211,189 @@ const AddItemPurchasedModal = ({ isOpen, onClose, onSubmit }) => {
               />
               <Button
                 type="button"
-                variant="outline"
+                className="w-full h-9 text-xs bg-yellow-400 hover:bg-yellow-500 text-black"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Upload className="w-4 h-4 mr-2" />
+                <Upload className="w-3 h-3 mr-2" />
                 Upload Image
               </Button>
-              <p className="text-sm text-muted-foreground mt-1">
-                JPG, PNG, GIF up to 5MB
-              </p>
+              <Button
+                type="button"
+                className="w-full h-9 text-xs bg-yellow-400 hover:bg-yellow-500 text-black"
+                onClick={() => {
+                  // This would open camera scan dialog
+                  console.log('Open AI camera scan');
+                }}
+              >
+                <Camera className="w-3 h-3 mr-2" />
+                Scan with AI Camera
+              </Button>
+              <Button
+                type="button"
+                className="w-full h-9 text-xs bg-yellow-400 hover:bg-yellow-500 text-black"
+                onClick={() => {
+                  // This would open barcode scanner
+                  console.log('Open barcode scanner');
+                }}
+              >
+                <Scan className="w-3 h-3 mr-2" />
+                Scan Barcode
+              </Button>
               {errors.image && <p className="text-sm text-destructive">{errors.image}</p>}
+            </div>
+          </div>
+
+          {/* Form Section - Right Side */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Item Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="itemSelect">Select Item</Label>
+              <Select onValueChange={handleItemSelect} value={formData.itemId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Search and select an item" />
+                </SelectTrigger>
+                <SelectContent>
+                  {items.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.code} - {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.itemId && <p className="text-sm text-destructive">{errors.itemId}</p>}
+            </div>
+
+            {/* Item Details Row */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Item Code (Read-only) */}
+              <div className="space-y-2">
+                <Label htmlFor="itemCode">Item Code</Label>
+                <Input
+                  id="itemCode"
+                  value={formData.itemCode}
+                  readOnly
+                  className="bg-muted"
+                />
+              </div>
+
+              {/* Category (Read-only) */}
+              <div className="space-y-2">
+                <Label htmlFor="category">Category</Label>
+                <Input
+                  id="category"
+                  value={formData.category}
+                  readOnly
+                  className="bg-muted"
+                />
+              </div>
+            </div>
+
+            {/* Item Name (Read-only) */}
+            <div className="space-y-2">
+              <Label htmlFor="itemName">Item Name</Label>
+              <Input
+                id="itemName"
+                value={formData.itemName}
+                readOnly
+                className="bg-muted"
+              />
+            </div>
+
+            {/* Type and Unit Row */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Type (Read-only) */}
+              <div className="space-y-2">
+                <Label htmlFor="type">Type</Label>
+                <Input
+                  id="type"
+                  value={formData.type}
+                  readOnly
+                  className="bg-muted"
+                />
+              </div>
+
+              {/* Unit (Read-only) */}
+              <div className="space-y-2">
+                <Label htmlFor="unit">Unit</Label>
+                <Input
+                  id="unit"
+                  value={formData.unit}
+                  readOnly
+                  className="bg-muted"
+                />
+              </div>
+            </div>
+
+            {/* Quantity and Unit Price Row */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Quantity */}
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
+                  placeholder="Enter quantity"
+                />
+                {errors.quantity && <p className="text-sm text-destructive">{errors.quantity}</p>}
+              </div>
+
+              {/* Unit Price */}
+              <div className="space-y-2">
+                <Label htmlFor="unitPrice">Unit Price</Label>
+                <Input
+                  id="unitPrice"
+                  type="text"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={formData.unitPrice}
+                  onChange={(e) => setFormData(prev => ({ ...prev, unitPrice: e.target.value }))}
+                  placeholder="Enter unit price"
+                />
+                {errors.unitPrice && <p className="text-sm text-destructive">{errors.unitPrice}</p>}
+              </div>
+            </div>
+
+            {/* Total Cost (Calculated) */}
+            <div className="space-y-2">
+              <Label htmlFor="totalCost">Total Cost</Label>
+              <Input
+                id="totalCost"
+                value={formData.totalCost}
+                readOnly
+                className="bg-muted"
+              />
+            </div>
+
+            {/* Source */}
+            <div className="space-y-2">
+              <Label htmlFor="source">Source</Label>
+              <Select onValueChange={(value) => setFormData(prev => ({ ...prev, source: value }))} value={formData.source}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select source" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sources.map((source) => (
+                    <SelectItem key={source} value={source}>
+                      {source}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.source && <p className="text-sm text-destructive">{errors.source}</p>}
             </div>
           </div>
         </div>
 
         <DialogFooter className="pt-4">
-          <Button variant="outline" onClick={handleClose}>
+          <Button variant="outline" className="bg-white hover:bg-gray-100 text-gray-900 border-gray-300" onClick={handleClose}>
             Cancel
           </Button>
           <Button onClick={handleSubmit}>
-            Add Item to SDO-PSU
+            Add Item
           </Button>
         </DialogFooter>
       </DialogContent>
