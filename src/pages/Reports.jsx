@@ -22,12 +22,10 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {
-  FileText,
   Download,
   ClipboardList,
   BarChart3,
   Calendar,
-  Shield,
   Printer,
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
@@ -63,14 +61,6 @@ const Reports = () => {
       description: 'All transactions including deliveries, issues, and disposals',
       icon: BarChart3,
       color: 'text-info',
-      adminOnly: true,
-    },
-    {
-      id: 'coa',
-      title: 'COA Summary Report',
-      description: 'Audit-ready report with complete documentation trail',
-      icon: Shield,
-      color: 'text-success',
       adminOnly: true,
     },
     {
@@ -236,30 +226,30 @@ const Reports = () => {
 
       <div className="p-6 space-y-6 animate-fade-in">
         {/* Report Type Selection */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {reportTypes
             .filter((r) => !r.adminOnly || isAdmin)
             .map((report) => (
               <Card
                 key={report.id}
-                className={`cursor-pointer transition-all ${
+                className={`cursor-pointer transition-all flex flex-col ${
                   reportType === report.id
                     ? 'ring-2 ring-primary border-primary'
                     : 'hover:border-muted-foreground/30'
                 }`}
                 onClick={() => setReportType(report.id)}
               >
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-3">
-                    <report.icon className={`w-6 h-6 ${report.color}`} />
-                    <CardTitle className="text-base">{report.title}</CardTitle>
+                <CardHeader className="pb-2 flex-1">
+                  <div className="flex items-start gap-3">
+                    <report.icon className={`w-6 h-6 shrink-0 ${report.color}`} />
+                    <div className="min-w-0">
+                      <CardTitle className="text-base">{report.title}</CardTitle>
+                      <CardDescription className="text-sm mt-1.5">
+                        {report.description}
+                      </CardDescription>
+                    </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-sm">
-                    {report.description}
-                  </CardDescription>
-                </CardContent>
               </Card>
             ))}
         </div>
