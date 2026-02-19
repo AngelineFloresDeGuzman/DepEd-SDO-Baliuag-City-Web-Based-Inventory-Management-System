@@ -103,31 +103,53 @@ const defaultUnitPrices = {
   "Other Supplies": 100,
 };
 
+// Simple deterministic pseudo-random generator based on a string seed
+const seededRandom = (seed, min = 0, max = 1) => {
+  let h = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  // Mulberry32-style
+  h += 0x6D2B79F5;
+  let t = Math.imul(h ^ (h >>> 15), 1 | h);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  const r = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  return min + r * (max - min);
+};
+
 export const generateInventory = (schoolId) => {
   const conditions = ["Good", "Good", "Good", "Damaged", "For Repair"];
   const today = new Date();
 
   return items.map((item) => {
-    const daysAgo = Math.floor(Math.random() * 90) + 1;
+    const seedBase = `${schoolId || "none"}-${item.id}`;
+    const daysAgo = Math.floor(seededRandom(`${seedBase}-days`, 1, 91));
     const dateAcquired = new Date(today);
     dateAcquired.setDate(dateAcquired.getDate() - daysAgo);
-    const quantity = Math.floor(Math.random() * 50) + 1;
-    const unitPrice = (defaultUnitPrices[item.category] || 100) * (0.8 + Math.random() * 0.4);
+
+    const quantity = Math.floor(seededRandom(`${seedBase}-qty`, 1, 51));
+    const unitPriceFactor = seededRandom(`${seedBase}-price`, 0.8, 1.2);
+    const unitPrice = (defaultUnitPrices[item.category] || 100) * unitPriceFactor;
     const totalCost = Math.round(quantity * unitPrice);
+
+    const sourceIndex = Math.floor(seededRandom(`${seedBase}-source`, 0, sources.length));
+    const conditionIndex = Math.floor(seededRandom(`${seedBase}-cond`, 0, conditions.length));
+    const lastUpdatedOffsetDays = Math.floor(seededRandom(`${seedBase}-updated`, 0, 7));
+
+    const lastUpdatedDate = new Date(
+      Date.now() - lastUpdatedOffsetDays * 24 * 60 * 60 * 1000
+    );
+
     return {
       ...item,
       schoolId,
       quantity,
       unitPrice: Math.round(unitPrice * 100) / 100,
       totalCost,
-      source: sources[Math.floor(Math.random() * sources.length)],
-      condition: conditions[Math.floor(Math.random() * conditions.length)],
+      source: sources[sourceIndex],
+      condition: conditions[conditionIndex],
       dateAcquired: dateAcquired.toISOString().split("T")[0],
-      lastUpdated: new Date(
-        Date.now() - Math.floor(Math.random() * 7) * 24 * 60 * 60 * 1000
-      )
-        .toISOString()
-        .split("T")[0],
+      lastUpdated: lastUpdatedDate.toISOString().split("T")[0],
     };
   });
 };
