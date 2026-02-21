@@ -66,21 +66,18 @@ const destinationSchools = schools.filter((s) => s.id !== 'sdo');
 
 // ─── Helper: Generate QR-code placeholder SVG data URL ───────────────────────
 const makeQrDataUrl = (text) => {
-  // Lightweight visual placeholder; replace with a real QR lib if desired
   const size = 120;
   const cells = 10;
   const cell = size / cells;
   let rects = '';
   for (let r = 0; r < cells; r++) {
     for (let c = 0; c < cells; c++) {
-      // deterministic pseudo-random pattern based on text + position
       const seed = (text.charCodeAt((r * cells + c) % text.length) + r * 31 + c * 17) % 3;
       if (seed === 0) {
         rects += `<rect x="${c * cell}" y="${r * cell}" width="${cell}" height="${cell}" fill="#1a1a1a"/>`;
       }
     }
   }
-  // Finder patterns (top-left, top-right, bottom-left corners)
   const fp = (x, y) =>
     `<rect x="${x}" y="${y}" width="${cell * 3}" height="${cell * 3}" fill="#1a1a1a" rx="1"/>
      <rect x="${x + cell}" y="${y + cell}" width="${cell}" height="${cell}" fill="white"/>`;
@@ -128,7 +125,6 @@ const AnalyticsPanel = ({ transfers }) => {
   const rejected = transfers.filter((t) => t.status === 'Rejected').length;
   const total = transfers.length;
 
-  // Most transferred items
   const itemCount = {};
   transfers.forEach((t) => {
     t.items.forEach((it) => {
@@ -139,7 +135,6 @@ const AnalyticsPanel = ({ transfers }) => {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3);
 
-  // School pair frequency
   const pairCount = {};
   transfers.forEach((t) => {
     const key = `${t.schoolName} → ${t.targetSchoolName}`;
@@ -156,7 +151,6 @@ const AnalyticsPanel = ({ transfers }) => {
         <h3 className="font-display font-semibold text-foreground">Transfer Analytics</h3>
       </div>
 
-      {/* Status breakdown */}
       <div className="grid grid-cols-3 gap-3">
         {[
           { label: 'Approved', value: approved, color: 'text-success', bg: 'bg-success/10' },
@@ -171,7 +165,6 @@ const AnalyticsPanel = ({ transfers }) => {
         ))}
       </div>
 
-      {/* Progress bar */}
       {total > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs text-muted-foreground font-medium">Status Distribution</p>
@@ -198,7 +191,6 @@ const AnalyticsPanel = ({ transfers }) => {
         </div>
       )}
 
-      {/* Top items */}
       {topItems.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-muted-foreground mb-2">Most Transferred Items</p>
@@ -218,7 +210,6 @@ const AnalyticsPanel = ({ transfers }) => {
         </div>
       )}
 
-      {/* Top school pair */}
       {topPair && (
         <div className="rounded-lg border border-border p-3 bg-muted/30">
           <p className="text-xs font-semibold text-muted-foreground mb-1">
@@ -522,6 +513,10 @@ const Transfers = () => {
       ? Number((computedUnitPrice * newTransferQuantity).toFixed(2))
       : 0;
 
+  // ── Quantity validation ──
+  const maxAvailableQty = selectedWarehouseStats?.totalQuantity ?? Infinity;
+  const isQtyOverLimit = selectedWarehouseStats != null && newTransferQuantity > maxAvailableQty;
+
   // ── Filtered + Paginated ──
   const filteredTransfers = transfers.filter((t) => {
     const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
@@ -729,13 +724,6 @@ const Transfers = () => {
     };
     addTransfer(transfer);
     addNotification({
-      title: 'Transfer created',
-      message: `SDO created transfer ${refNo}: ${newTransferQuantity}× ${item.name} → ${destination.name}.`,
-      type: 'transfer',
-      forAdmin: true,
-      transferId: transfer.id,
-    });
-    addNotification({
       title: 'New transfer incoming',
       message: `SDO is transferring ${newTransferQuantity}× ${item.name} to your school. Ref: ${refNo}.`,
       type: 'transfer',
@@ -790,7 +778,6 @@ const Transfers = () => {
               </SelectContent>
             </Select>
 
-            {/* Analytics toggle */}
             <Button
               variant="outline"
               size="sm"
@@ -828,7 +815,6 @@ const Transfers = () => {
               and print the transfer slip.
             </p>
           </div>
-          {/* Quick legend */}
           <div className="flex-shrink-0 hidden sm:flex flex-col gap-1 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <span className="inline-block w-2 h-2 rounded-full bg-info" /> Pending Receiver
@@ -862,7 +848,6 @@ const Transfers = () => {
               </TableHeader>
               <TableBody>
                 {paginatedTransfers.map((transfer) => {
-                  // SLA overdue highlight
                   const daysSince = (new Date() - new Date(transfer.date)) / (1000 * 60 * 60 * 24);
                   const isOverdue = transfer.status.startsWith('Pending') && daysSince > 7;
                   return (
@@ -951,7 +936,7 @@ const Transfers = () => {
       </div>
 
       {/* ══════════════════════════════════════════════════════════
-          Transfer Detail Dialog — enhanced
+          Transfer Detail Dialog
       ══════════════════════════════════════════════════════════ */}
       <Dialog
         open={!!selectedTransfer}
@@ -973,7 +958,6 @@ const Transfers = () => {
           {selectedTransfer && (
             <div className="space-y-5 overflow-y-auto pr-1 flex-1">
 
-              {/* ── Quick actions bar ── */}
               <div className="flex flex-wrap gap-2 pb-1 border-b border-border">
                 <Button
                   size="sm"
@@ -995,7 +979,6 @@ const Transfers = () => {
                 </Button>
               </div>
 
-              {/* ── Meta grid ── */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Reference No.</p>
@@ -1025,7 +1008,6 @@ const Transfers = () => {
                 </div>
               </div>
 
-              {/* ── Transfer timeline ── */}
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-2">Status Timeline</p>
                 <div className="flex items-center gap-1 text-xs">
@@ -1058,7 +1040,6 @@ const Transfers = () => {
                 </div>
               </div>
 
-              {/* ── Total amount ── */}
               {typeof selectedTransfer.totalAmount === 'number' &&
                 selectedTransfer.totalAmount > 0 && (
                   <div className="rounded-lg bg-muted/40 border border-border p-3 flex items-center justify-between">
@@ -1075,7 +1056,6 @@ const Transfers = () => {
                   </div>
                 )}
 
-              {/* ── Items ── */}
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-2">Items</p>
                 <div className="space-y-2">
@@ -1123,7 +1103,6 @@ const Transfers = () => {
                 </div>
               </div>
 
-              {/* ── Reason ── */}
               {selectedTransfer.reason && (
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground mb-1">Reason / Notes</p>
@@ -1131,7 +1110,6 @@ const Transfers = () => {
                 </div>
               )}
 
-              {/* ── Rejection reason ── */}
               {selectedTransfer.rejectionReason && (
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground mb-1">
@@ -1143,12 +1121,10 @@ const Transfers = () => {
                 </div>
               )}
 
-              {/* ── Comment thread ── */}
               <div className="border-t border-border pt-4">
                 <CommentThread transferId={selectedTransfer.id} user={user} />
               </div>
 
-              {/* ── School user: mark as received ── */}
               {canCurrentUserActOnTransfer(selectedTransfer) && (
                 <div className="flex justify-end border-t border-border pt-3">
                   <Button onClick={handleMarkAsReceivedFromDialog}>
@@ -1158,7 +1134,6 @@ const Transfers = () => {
                 </div>
               )}
 
-              {/* ── Admin actions ── */}
               {isAdmin && selectedTransfer.status.startsWith('Pending') && (
                 <div className="border-t border-border pt-3 space-y-3">
                   {!showRejectInput ? (
@@ -1206,7 +1181,6 @@ const Transfers = () => {
                 </div>
               )}
 
-              {/* ── Admin: delete ── */}
               {canAdminDeleteTransfer(selectedTransfer) && (
                 <div className="flex justify-end border-t border-border pt-3">
                   <Button
@@ -1254,7 +1228,10 @@ const Transfers = () => {
           <div className="space-y-4 overflow-y-auto pr-1 flex-1 mt-2">
             <div>
               <Label>Item *</Label>
-              <Select value={newTransferItemId} onValueChange={setNewTransferItemId}>
+              <Select value={newTransferItemId} onValueChange={(val) => {
+                setNewTransferItemId(val);
+                setNewTransferQuantity(1); // reset qty when item changes
+              }}>
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Select item" />
                 </SelectTrigger>
@@ -1300,7 +1277,7 @@ const Transfers = () => {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground">Available in SDO</p>
-                  <p className="text-sm">
+                  <p className="text-sm font-semibold text-primary">
                     {selectedWarehouseStats.totalQuantity} {selectedItemMeta.unit}
                   </p>
                 </div>
@@ -1333,17 +1310,36 @@ const Transfers = () => {
                 <Input
                   type="number"
                   min={1}
+                  max={selectedWarehouseStats?.totalQuantity ?? undefined}
                   value={newTransferQuantity}
-                  onChange={(e) =>
-                    setNewTransferQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))
-                  }
-                  className="mt-1"
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10) || 1;
+                    const max = selectedWarehouseStats?.totalQuantity ?? Infinity;
+                    setNewTransferQuantity(Math.min(Math.max(1, parsed), max));
+                  }}
+                  className={`mt-1 ${
+                    isQtyOverLimit
+                      ? 'border-destructive focus-visible:ring-destructive'
+                      : ''
+                  }`}
                 />
-                {selectedWarehouseStats && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Max: {selectedWarehouseStats.totalQuantity} {selectedItemMeta?.unit}
-                  </p>
-                )}
+                {selectedWarehouseStats ? (
+                  isQtyOverLimit ? (
+                    <p className="mt-1.5 text-xs text-destructive font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      Exceeds available stock — maximum is{' '}
+                      <strong>{selectedWarehouseStats.totalQuantity}</strong>{' '}
+                      {selectedItemMeta?.unit}
+                    </p>
+                  ) : (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Available:{' '}
+                      <span className="font-semibold text-foreground">
+                        {selectedWarehouseStats.totalQuantity} {selectedItemMeta?.unit}
+                      </span>
+                    </p>
+                  )
+                ) : null}
               </div>
               <div>
                 <Label>Destination (receiving school) *</Label>
@@ -1381,18 +1377,24 @@ const Transfers = () => {
             </div>
 
             <div>
-              <Label>Note</Label>
+              <Label>Remarks</Label>
               <Textarea
-                placeholder="Optional note…"
+                placeholder="Optional remarks…"
                 value={newTransferNote}
                 onChange={(e) => setNewTransferNote(e.target.value)}
-                className="mt-1"
+                className="mt-1 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none"
                 rows={4}
               />
             </div>
           </div>
 
           <DialogFooter className="flex-shrink-0">
+            {isQtyOverLimit && (
+              <p className="text-xs text-destructive flex items-center gap-1 mr-auto">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Quantity exceeds available stock
+              </p>
+            )}
             <Button
               variant="outline"
               onClick={() => {
@@ -1409,8 +1411,7 @@ const Transfers = () => {
                 !newTransferDestinationId ||
                 !newTransferSourceOfFund ||
                 newTransferQuantity < 1 ||
-                (selectedWarehouseStats &&
-                  newTransferQuantity > selectedWarehouseStats.totalQuantity)
+                isQtyOverLimit
               }
             >
               Submit Transfer
