@@ -27,6 +27,7 @@ import {
   BarChart3,
   Calendar,
   Printer,
+  FileText,
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import MovementReport from '@/components/reports/MovementReport';
