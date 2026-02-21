@@ -259,11 +259,22 @@
     background: white;
     color: black;
   }
+  /* Table: buo kada page - header umuulit, walang putol na row */
+  .inventory-report-print table,
+  .inventory-report-print .report-table {
+    page-break-inside: auto;
+    width: 100%;
+  }
   .inventory-report-print thead {
     display: table-header-group;
   }
+  .inventory-report-print thead tr {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
   .inventory-report-print tbody tr {
-    page-break-inside: auto;
+    page-break-inside: avoid;
+    page-break-after: auto;
   }
   .inventory-report-print .report-header {
     page-break-after: avoid;
@@ -271,11 +282,14 @@
   .inventory-report-print .report-filters {
     page-break-after: avoid;
   }
-  .inventory-report-print table {
-    page-break-inside: auto;
-  }
   .inventory-report-print .stock-card {
     page-break-inside: avoid;
+  }
+  .inventory-report-print .report-footer,
+  .inventory-report-print .report-signature-block {
+    page-break-inside: avoid;
+    page-break-before: auto;
+    padding-bottom: 3rem; /* extra space so last line is never cut when printing */
   }
 }
 

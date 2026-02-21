@@ -62,6 +62,8 @@ import { Calendar } from '@/components/ui/calendar';
 import AddSchoolItemModal from '@/components/inventory/AddSchoolItemModal';
 import AddItemPurchasedModal from '@/components/inventory/AddItemPurchasedModal';
 import StockCardReport from '@/components/inventory/StockCardReport';
+import RSMIReport from '@/components/inventory/RSMIReport';
+import RCPIReport from '@/components/inventory/RCPIReport';
 import { TablePagination } from '@/components/ui/table-pagination';
 import TableCellAutoFit from '@/components/ui/TableCellAutoFit';
 import TableCellWrap from '@/components/ui/TableCellWrap';
@@ -91,6 +93,7 @@ const Inventory = () => {
   const [invPage, setInvPage] = useState(1);
   const [rawInvPage, setRawInvPage] = useState(1);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [reportType, setReportType] = useState('stockcard'); // 'stockcard', 'rsmi', 'rcpi'
 
   // Date filter state
   const [dateFilterType, setDateFilterType] = useState('all');
@@ -381,17 +384,44 @@ const Inventory = () => {
     return parts.length > 0 ? parts.join(' • ') : 'No filters applied (showing all)';
   };
 
-  const getPdfOptions = () => ({
-    margin: [5, 12.7, 12.7, 12.7],
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-  });
+  const getPdfOptions = () => {
+    // Use landscape for RCPI report (many columns), portrait for others
+    const isRCPI = reportType === 'rcpi';
+    return {
+      margin: isRCPI ? [10, 8, 45, 8] : [10, 12.7, 45, 12.7], // Smaller side margins for RCPI wide table
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: isRCPI ? 1400 : 1200, // Wider capture for RCPI to ensure Remarks column is included
+        allowTaint: true,
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: isRCPI ? 'landscape' : 'portrait' },
+      pagebreak: { avoid: ['tr'] }, // Buo ang table kada page - walang putol na row
+    };
+  };
+
+  const getReportFilename = () => {
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const reportTypeNames = {
+      stockcard: 'Stock-Card',
+      rsmi: 'RSMI',
+      rcpi: 'RCPI',
+    };
+    const typeName = reportTypeNames[reportType] || 'Report';
+    return `${typeName}-Report-${dateStr}.pdf`;
+  };
 
   const handlePrintReport = async () => {
     if (!reportRef.current || filteredInventory.length === 0) return;
     const el = reportRef.current;
-    const opt = { ...getPdfOptions(), filename: null };
+    const opt = { 
+      ...getPdfOptions(), 
+      filename: null,
+      enableLinks: false,
+    };
     try {
       const blob = await html2pdf().set(opt).from(el).outputPdf('blob');
       const url = URL.createObjectURL(blob);
@@ -404,7 +434,7 @@ const Inventory = () => {
       } else {
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Stock-Card-Report-${new Date().toISOString().slice(0, 10)}.pdf`;
+        a.download = getReportFilename();
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -418,7 +448,8 @@ const Inventory = () => {
     const el = reportRef.current;
     const opt = {
       ...getPdfOptions(),
-      filename: `Stock-Card-Report-${new Date().toISOString().slice(0, 10)}.pdf`,
+      filename: getReportFilename(),
+      enableLinks: false,
     };
     try {
       await html2pdf().set(opt).from(el).save();
@@ -1227,9 +1258,26 @@ const Inventory = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Inventory Report Modal - Stock Card format */}
+      {/* Inventory Report Modal - Multiple report types */}
       <Dialog open={showReportModal} onOpenChange={setShowReportModal}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col print:max-w-none print:max-h-none print:border-0 print:shadow-none print:p-0">
+          {/* Report Type Selector */}
+          <DialogHeader className="print:hidden flex-shrink-0 pb-4">
+            <DialogTitle>View Report</DialogTitle>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="report-type" className="text-sm font-medium">Report Type:</Label>
+              <Select value={reportType} onValueChange={setReportType}>
+                <SelectTrigger id="report-type" className="w-48">
+                  <SelectValue placeholder="Select report type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stockcard">Stock Card</SelectItem>
+                  <SelectItem value="rsmi">RSMI</SelectItem>
+                  <SelectItem value="rcpi">RPCI</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </DialogHeader>
           <div className="overflow-y-auto flex-1 print:overflow-visible bg-white text-black p-0">
             <div ref={reportRef} className="inventory-report-print min-h-0">
               {filteredInventory.length === 0 ? (
@@ -1237,13 +1285,33 @@ const Inventory = () => {
                   No items to report with the current filters.
                 </div>
               ) : (
-                <StockCardReport
-                items={filteredInventory}
-                schoolId={selectedSchool === 'all' ? null : selectedSchool}
-                isAdmin={isAdmin}
-                filtersSummary={getFiltersSummary()}
-              />
-            )}
+                <>
+                  {reportType === 'stockcard' && (
+                    <StockCardReport
+                      items={filteredInventory}
+                      schoolId={selectedSchool === 'all' ? null : selectedSchool}
+                      isAdmin={isAdmin}
+                      filtersSummary={getFiltersSummary()}
+                    />
+                  )}
+                  {reportType === 'rsmi' && (
+                    <RSMIReport
+                      items={filteredInventory}
+                      schoolId={selectedSchool === 'all' ? null : selectedSchool}
+                      isAdmin={isAdmin}
+                      filtersSummary={getFiltersSummary()}
+                    />
+                  )}
+                  {reportType === 'rcpi' && (
+                    <RCPIReport
+                      items={filteredInventory}
+                      schoolId={selectedSchool === 'all' ? null : selectedSchool}
+                      isAdmin={isAdmin}
+                      filtersSummary={getFiltersSummary()}
+                    />
+                  )}
+                </>
+              )}
             </div>
           </div>
           <DialogFooter className="print:hidden flex-shrink-0">

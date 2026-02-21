@@ -33,6 +33,9 @@ import {
 import html2pdf from 'html2pdf.js';
 import MovementReport from '@/components/reports/MovementReport';
 import InventoryReport from '@/components/reports/InventoryReport';
+import StockCardReport from '@/components/inventory/StockCardReport';
+import RSMIReport from '@/components/inventory/RSMIReport';
+import RCPIReport from '@/components/inventory/RCPIReport';
 
 const Reports = () => {
   const { user } = useAuth();
@@ -55,6 +58,27 @@ const Reports = () => {
       title: 'Inventory Report',
       description: 'Complete list of all inventory items with quantities and conditions',
       icon: ClipboardList,
+      color: 'text-primary',
+    },
+    {
+      id: 'stockcard',
+      title: 'Stock Card (Appendix 58)',
+      description: 'Per-item stock card for audit and monitoring',
+      icon: FileText,
+      color: 'text-primary',
+    },
+    {
+      id: 'rsmi',
+      title: 'RSMI (Appendix 64)',
+      description: 'Report of Supplies and Materials Issued',
+      icon: FileText,
+      color: 'text-primary',
+    },
+    {
+      id: 'rcpi',
+      title: 'RCPI (Appendix 66)',
+      description: 'Report on the Physical Count of Inventories',
+      icon: FileText,
       color: 'text-primary',
     },
     {
@@ -160,10 +184,11 @@ const Reports = () => {
   }, [selectedSchool, selectedCategory, selectedItemType, isAdmin, user?.schoolId, rawInventory, getSchoolInventory, getConditionOverride]);
 
   const getPdfOptions = () => ({
-    margin: [5, 12.7, 12.7, 12.7],
+    margin: [10, 12.7, 45, 12.7], // top, left, bottom, right (mm) - large bottom so signature block is never cut
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { avoid: ['tr'] }, // Buo ang table kada page - walang putol na row
   });
 
   const getReportFilename = () => {
@@ -270,82 +295,66 @@ const Reports = () => {
             Report Configuration
           </h3>
 
-          <div className="space-y-4">
+          <div className="flex flex-row flex-nowrap items-center gap-3 overflow-x-auto">
             {/* School Selection (Admin only or locked for school users) */}
-            <div>
-              <Label htmlFor="school-select" className="text-sm font-medium">
-                School / Office
-              </Label>
-              {isAdmin ? (
-                <Select value={selectedSchool} onValueChange={setSelectedSchool}>
-                  <SelectTrigger id="school-select" className="mt-1.5">
-                    <SelectValue placeholder="Select school" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Schools</SelectItem>
-                    {schools.map((school) => (
-                      <SelectItem key={school.id} value={school.id}>
-                        {school.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="mt-1.5 p-2 rounded border bg-muted text-sm">
-                  {schools.find((s) => s.id === user?.schoolId)?.name}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Category Filter */}
-              <div>
-                <Label htmlFor="category-select" className="text-sm font-medium">
-                  Category
-                </Label>
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger id="category-select" className="mt-1.5">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {isAdmin ? (
+              <Select value={selectedSchool} onValueChange={setSelectedSchool}>
+                <SelectTrigger className="w-96 text-left bg-blue-50 border-blue-200 focus:border-blue-400 focus:ring-blue-200">
+                  <SelectValue placeholder="Select school" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Schools</SelectItem>
+                  {schools.map((school) => (
+                    <SelectItem key={school.id} value={school.id}>
+                      {school.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="p-2 rounded border bg-muted text-sm min-w-[200px]">
+                {schools.find((s) => s.id === user?.schoolId)?.name}
               </div>
+            )}
 
-              {/* Item Type */}
-              <div>
-                <Label htmlFor="item-type-select" className="text-sm font-medium">
-                  Item Type
-                </Label>
-                <Select value={selectedItemType} onValueChange={setSelectedItemType}>
-                  <SelectTrigger id="item-type-select" className="mt-1.5">
-                    <SelectValue placeholder="Select item type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="Consumable">Consumable</SelectItem>
-                    <SelectItem value="Semi-Expendable">Semi-Expendable</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Category Filter */}
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-44 bg-blue-50 border-blue-200 focus:border-blue-400 focus:ring-blue-200">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Item Type */}
+            <Select value={selectedItemType} onValueChange={setSelectedItemType}>
+              <SelectTrigger className="w-36 bg-blue-50 border-blue-200 focus:border-blue-400 focus:ring-blue-200">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="Consumable">Consumable</SelectItem>
+                <SelectItem value="Semi-Expendable">Semi-Expendable</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 ml-auto">
+              <Button onClick={handleGenerateReport} className="bg-warning hover:bg-warning/90">
+                <Download className="w-4 h-4 mr-2" />
+                Generate PDF Report
+              </Button>
+              <Button variant="outline" onClick={handlePrintPreview} className="bg-warning hover:bg-warning/90 border-warning text-foreground">
+                <Printer className="w-4 h-4 mr-2" />
+                Print Preview
+              </Button>
             </div>
-          </div>
-
-          <div className="flex gap-3 mt-6">
-            <Button onClick={handleGenerateReport}>
-              <Download className="w-4 h-4 mr-2" />
-              Generate PDF Report
-            </Button>
-            <Button variant="outline" onClick={handlePrintPreview}>
-              <Printer className="w-4 h-4 mr-2" />
-              Print Preview
-            </Button>
           </div>
         </div>
 
@@ -362,7 +371,7 @@ const Reports = () => {
             </span>
           </div>
 
-          <div className="p-6" ref={reportRef}>
+          <div className="p-6 inventory-report-print" ref={reportRef}>
             {reportType === 'inventory' ? (
               <InventoryReport
                 inventory={filteredInventory}
@@ -378,6 +387,24 @@ const Reports = () => {
                 selectedSchool={selectedSchool}
                 selectedCategory={selectedCategory}
                 selectedItemType={selectedItemType}
+              />
+            ) : reportType === 'stockcard' ? (
+              <StockCardReport
+                items={filteredInventory}
+                schoolId={selectedSchool === 'all' ? null : selectedSchool}
+                isAdmin={isAdmin}
+              />
+            ) : reportType === 'rsmi' ? (
+              <RSMIReport
+                items={filteredInventory}
+                schoolId={selectedSchool === 'all' ? null : selectedSchool}
+                isAdmin={isAdmin}
+              />
+            ) : reportType === 'rcpi' ? (
+              <RCPIReport
+                items={filteredInventory}
+                schoolId={selectedSchool === 'all' ? null : selectedSchool}
+                isAdmin={isAdmin}
               />
             ) : (
               <InventoryReport

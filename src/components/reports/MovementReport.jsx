@@ -373,8 +373,8 @@ const MovementReport = ({
           </div>
         </div>
 
-        {/* Footer pinned near bottom of page */}
-        <div className="mt-8 pt-4 border-t border-border grid grid-cols-2 gap-4 text-sm">
+        {/* Footer pinned near bottom of page - do not cut when printing */}
+        <div className="report-footer mt-8 pt-4 pb-12 border-t border-border grid grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-muted-foreground">Prepared By:</p>
             <p className="font-medium mt-4 border-t border-foreground w-48 pt-1">

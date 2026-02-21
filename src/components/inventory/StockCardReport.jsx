@@ -216,7 +216,7 @@ const StockCardReport = ({ items, schoolId, isAdmin, filtersSummary }) => {
       })}
 
       {filtersSummary && items.length > 0 && (
-        <div className="text-xs text-muted-foreground pt-4 pb-4 border-t border-border break-words overflow-visible" style={{ pageBreakInside: 'avoid' }}>
+        <div className="report-footer text-xs text-muted-foreground pt-4 pb-12 border-t border-border break-words overflow-visible" style={{ pageBreakInside: 'avoid' }}>
           Filters applied: {filtersSummary} • Prepared by: {new Date().toLocaleDateString('en-PH')}
         </div>
       )}
