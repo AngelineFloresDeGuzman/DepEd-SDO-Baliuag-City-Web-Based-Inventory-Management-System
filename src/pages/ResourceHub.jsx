@@ -62,7 +62,7 @@ const SDO_SCHOOL = { id: 'sdo', name: 'Schools Division Office of City of Baliua
 
 const ResourceHub = () => {
   const { user } = useAuth();
-  const { rawInventory } = useRawInventory();
+  const { rawInventory, updateRawEntry } = useRawInventory();
   const { getSchoolInventory } = useSchoolInventory();
   const schoolInventory = user?.schoolId ? getSchoolInventory(user.schoolId) : [];
   const { addTransfer, transfers, updateTransferStatus } = useTransfers();
@@ -94,6 +94,10 @@ const ResourceHub = () => {
   const [transferToMarkReceived, setTransferToMarkReceived] = useState(null);
   const [receivedNotes, setReceivedNotes] = useState('');
   const [processingReceived, setProcessingReceived] = useState(false);
+
+  // For cancel request confirmation dialog
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [transferToCancel, setTransferToCancel] = useState(null);
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -203,6 +207,8 @@ const ResourceHub = () => {
       totalPendingRequests: pendingRequests.length,
       schoolRequestCount: schoolRequests.length,
       mostRequested,
+      totalCompletedTransfers: transfers.filter(t => t.status === 'Received' || t.status === 'In Transit' || t.status === 'Approved').length,
+      totalAllTransfers: transfers.length,
     };
   }, [filteredRaw, transfers, pendingRequests, user?.schoolId]);
 
@@ -287,6 +293,20 @@ const ResourceHub = () => {
     setRequestReason('');
   };
 
+  // Handle cancel request with confirmation
+  const handleCancelRequest = () => {
+    setShowCancelConfirm(true);
+  };
+
+  const confirmCancelRequest = () => {
+    setSelectedItem(null);
+    setRequestSource(null);
+    setRequestQuantity(1);
+    setRequestReason('');
+    setRequestUrgency('normal');
+    setShowCancelConfirm(false);
+  };
+
   // Handle approve/reject actions
   const handleApproveClick = (transfer) => {
     setSelectedTransfer(transfer);
@@ -313,13 +333,27 @@ const ResourceHub = () => {
     setTimeout(() => {
       updateTransferStatus(selectedTransfer.id, newStatus, extraUpdates);
       
+      // Deduct quantity from SDO warehouse when approved
+      if (actionType === 'approve' && selectedTransfer.items) {
+        selectedTransfer.items.forEach((item) => {
+          const rawItem = rawInventory.find((r) => r.itemId === item.itemId || r.name === item.itemName);
+          if (rawItem) {
+            const newQty = Math.max(0, (rawItem.quantity || 0) - item.quantity);
+            updateRawEntry(rawItem.id, { quantity: newQty });
+          }
+        });
+      }
+      
       addNotification({
         title: actionType === 'approve' ? 'Transfer Approved' : 'Transfer Rejected',
         message: actionType === 'approve' 
           ? `${selectedTransfer.items?.map(i => i.itemName).join(', ')} approved for ${selectedTransfer.targetSchoolName}`
           : `Transfer request rejected for ${selectedTransfer.targetSchoolName}`,
         type: actionType === 'approve' ? 'approval' : 'rejection',
+        // Notify the requesting school and the requesting user directly so they receive the update
         forAdmin: false,
+        forSchoolId: selectedTransfer.targetSchoolId,
+        forUserId: selectedTransfer.createdBy,
         transferId: selectedTransfer.id,
       });
       
@@ -378,15 +412,16 @@ const ResourceHub = () => {
       <div className="p-6 space-y-8 animate-fade-in">
         {/* ========== NEW: Announcements Banner (Schools Only) ========== */}
         {!isAdmin && announcements.length > 0 && (
-          <div className="space-y-2">
-            {announcements.map((ann) => (
+          <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-500">
+            {announcements.map((ann, idx) => (
               <div
                 key={ann.id}
-                className={`p-4 rounded-lg border flex items-center gap-3 ${
+                className={`p-4 rounded-lg border flex items-center gap-3 transition-all duration-300 hover:shadow-md animate-in fade-in slide-in-from-left duration-500 ${
                   ann.type === 'warning'
                     ? 'bg-warning/10 border-warning/30'
                     : 'bg-info/10 border-info/30'
                 }`}
+                style={{ animationDelay: `${idx * 100}ms` }}
               >
                 {ann.type === 'warning' ? (
                   <AlertCircle className={`w-5 h-5 ${ann.type === 'warning' ? 'text-warning' : 'text-info'} shrink-0`} />
@@ -404,7 +439,7 @@ const ResourceHub = () => {
 
         {/* Success messages */}
         {showSuccess && (
-          <div className="p-4 rounded-lg bg-success/10 border border-success/20 flex items-center gap-3">
+          <div className="p-4 rounded-lg bg-success/10 border border-success/20 flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
             <CheckCircle className="w-5 h-5 text-success" />
             <p className="text-success font-medium">Request submitted. It is logged in the Transfers tab. Admin will be notified and will accept or reject.</p>
           </div>
@@ -413,59 +448,71 @@ const ResourceHub = () => {
         {/* ========== NEW: Statistics Dashboard (School View) ========== */}
         {!isAdmin && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-              <CardHeader className="pb-3">
-<CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                  <Package className="w-4 h-4 text-primary" />
-                  Available Items
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {rawInventory?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Units available from SDO</p>
-              </CardContent>
-            </Card>
+            {/* Available Items Card */}
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '0ms' }}>
+              <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 transition-all duration-300 hover:shadow-lg hover:border-primary/40">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                    <Package className="w-4 h-4 text-primary" />
+                    Available Items
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {rawInventory?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Units available from SDO</p>
+                </CardContent>
+              </Card>
+            </div>
 
-            <Card className="bg-gradient-to-br from-success/5 to-success/10 border-success/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-success" />
-                  Approved
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{myRequestHistory.filter(r => r.status === 'Approved' || r.status === 'In Transit' || r.status === 'Received').length}</div>
-                <p className="text-xs text-muted-foreground mt-1">Approved & delivered</p>
-              </CardContent>
-            </Card>
+            {/* Approved Card */}
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '75ms' }}>
+              <Card className="bg-gradient-to-br from-success/5 to-success/10 border-success/20 transition-all duration-300 hover:shadow-lg hover:border-success/40">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-success" />
+                    Approved
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{myRequestHistory.filter(r => r.status === 'Approved' || r.status === 'In Transit' || r.status === 'Received').length}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Approved & delivered</p>
+                </CardContent>
+              </Card>
+            </div>
 
-            <Card className="bg-gradient-to-br from-warning/5 to-warning/10 border-warning/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-warning" />
-                  Pending
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{myRequestHistory.filter(r => r.status?.includes('Pending')).length}</div>
-                <p className="text-xs text-muted-foreground mt-1">Awaiting SDO approval</p>
-              </CardContent>
-            </Card>
+            {/* Pending Card */}
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '150ms' }}>
+              <Card className="bg-gradient-to-br from-warning/5 to-warning/10 border-warning/20 transition-all duration-300 hover:shadow-lg hover:border-warning/40">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-warning" />
+                    Pending
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{myRequestHistory.filter(r => r.status?.includes('Pending')).length}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Awaiting SDO approval</p>
+                </CardContent>
+              </Card>
+            </div>
 
-            <Card className="bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                  <XCircle className="w-4 h-4 text-destructive" />
-                  Rejected
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{myRequestHistory.filter(r => r.status === 'Rejected').length}</div>
-                <p className="text-xs text-muted-foreground mt-1">Requests not approved</p>
-              </CardContent>
-            </Card>
+            {/* Rejected Card */}
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '225ms' }}>
+              <Card className="bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20 transition-all duration-300 hover:shadow-lg hover:border-destructive/40">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                    <XCircle className="w-4 h-4 text-destructive" />
+                    Rejected
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{myRequestHistory.filter(r => r.status === 'Rejected').length}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Requests not approved</p>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         )}
 
@@ -498,16 +545,16 @@ const ResourceHub = () => {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-success/5 to-success/10 border-success/20">
+            <Card className="bg-gradient-to-br from-success/5 to-success/10 border-success/20 transition-all duration-300 hover:shadow-lg hover:border-success/40">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-success" />
-                  Total Transfers
+                  Completed Transfers
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{transfers.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">All time</p>
+                <div className="text-2xl font-bold">{stats.totalCompletedTransfers}</div>
+                <p className="text-xs text-muted-foreground mt-1">Approved, in transit, or delivered</p>
               </CardContent>
             </Card>
           </div>
@@ -748,10 +795,11 @@ const ResourceHub = () => {
                   </h4>
                   {filteredRaw.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredRaw.map((row) => (
+                      {filteredRaw.map((row, idx) => (
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${(idx % 6) * 50}ms` }}>
                         <Card
                           key={row.id}
-                          className="hover:shadow-md hover:border-primary/40 transition-all cursor-pointer border-2"
+                          className="hover:shadow-md hover:border-primary/40 transition-all cursor-pointer border-2 h-full"
                           onClick={() => openRequestDialog(row, 'raw')}
                         >
                           <CardHeader className="pb-2">
@@ -773,6 +821,7 @@ const ResourceHub = () => {
                             </Button>
                           </CardContent>
                         </Card>
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -1132,7 +1181,7 @@ const ResourceHub = () => {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedItem(null)}>Cancel</Button>
+            <Button variant="outline" onClick={handleCancelRequest}>Cancel</Button>
             <Button
               onClick={handleRequestSubmit}
               disabled={!requestReason.trim() || requestQuantity < 1}
@@ -1143,7 +1192,31 @@ const ResourceHub = () => {
         </DialogContent>
       </Dialog>
 
-
+      {/* Cancel Request Confirmation Dialog */}
+      <Dialog open={showCancelConfirm} onOpenChange={(open) => !open && setShowCancelConfirm(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-warning" />
+              Discard Request?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to discard this request? Any information you've entered will be lost.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCancelConfirm(false)}>
+              Keep Editing
+            </Button>
+            <Button variant="destructive" onClick={confirmCancelRequest}>
+              <X className="w-4 h-4 mr-2" />
+              Discard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Approve/Reject Confirmation Dialog */}
       <Dialog open={showApproveRejectDialog} onOpenChange={(open) => !open && setShowApproveRejectDialog(false)}>
