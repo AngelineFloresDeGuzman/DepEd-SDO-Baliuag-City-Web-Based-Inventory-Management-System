@@ -337,13 +337,21 @@ const Reports = () => {
 
             {/* Action Buttons */}
             <div className="flex gap-2 ml-auto">
-              <Button onClick={handleGenerateReport} className="bg-warning hover:bg-warning/90">
+              <Button
+                size="sm"
+                className="bg-yellow-400 hover:bg-yellow-500 text-black"
+                onClick={handleGenerateReport}
+              >
                 <Download className="w-4 h-4 mr-2" />
-                Generate PDF Report
+                Export Report
               </Button>
-              <Button variant="outline" onClick={handlePrintPreview} className="bg-warning hover:bg-warning/90 border-warning text-foreground">
+              <Button
+                size="sm"
+                className="bg-yellow-400 hover:bg-yellow-500 text-black"
+                onClick={handlePrintPreview}
+              >
                 <Printer className="w-4 h-4 mr-2" />
-                Print Preview
+                Print Report
               </Button>
             </div>
           </div>
