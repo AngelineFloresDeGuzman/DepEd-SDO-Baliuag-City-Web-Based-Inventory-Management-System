@@ -38,7 +38,6 @@ import {
   ArrowDown,
   Send,
   Eye,
-  Download,
   Package,
   MapPin,
   Phone,
@@ -51,11 +50,9 @@ import {
   Brain,
   ChevronDown,
   ChevronRight,
-  Lightbulb,
   Target,
   Zap,
   ScanSearch,
-  ListFilter,
   RefreshCw,
   Info,
   Printer,
@@ -191,7 +188,7 @@ const printHealthReport = (result, scopedSchools, selectedLevel) => {
       return `<tr style="border-bottom:1px solid #f3f4f6;background:${idx % 2 === 0 ? '#fff' : '#fafafa'}">
         <td style="padding:5px 8px;font-weight:500">${s.name}</td>
         <td style="padding:5px 8px;color:#6b7280">${s.level}</td>
-        <td style="padding:5px 8px;text-align:center;font-weight:700">${s.completenessScore}%</td>
+        <td style="padding:5px 8px;text-align:center;font-weight:700">${s.completenessScore}</td>
         <td style="padding:5px 8px;text-align:center"><span class="pill ${pc}">${lbl}</span></td>
         <td style="padding:5px 8px;color:#6b7280">${formatDate(s.lastUpdated)}</td>
       </tr>`;
@@ -206,7 +203,7 @@ const printHealthReport = (result, scopedSchools, selectedLevel) => {
       <div class="header-right">
         <p class="meta">Scope: <strong>${opt?.label}</strong> &middot; ${scopedSchools.length} school${scopedSchools.length !== 1 ? 's' : ''}</p>
         <p class="meta">Generated: ${now}</p>
-        <p class="meta">Division Avg: <strong>${avgScore}%</strong></p>
+        <p class="meta">Division Avg: <strong>${avgScore}</strong></p>
       </div>
     </div>
 
@@ -214,10 +211,10 @@ const printHealthReport = (result, scopedSchools, selectedLevel) => {
       <div class="section-title">Overall Insights</div>
       <div class="health-card ${healthClass}">
         <div class="health-label" style="color:${healthColor}">Overall Insights Status</div>
-        <div class="health-value" style="color:${healthColor}">${result.overallHealth}&nbsp;<span class="pill ${badgeCls}">${avgScore}% avg</span></div>
+        <div class="health-value" style="color:${healthColor}">${result.overallHealth}&nbsp;<span class="pill ${badgeCls}">${avgScore} avg</span></div>
         <p class="health-headline">${result.headline}</p>
       </div>
-      <p class="meta">Score Key: <strong style="color:#15803d">Good &ge;90%</strong> &nbsp;&middot;&nbsp; <strong style="color:#a16207">Fair 75&ndash;89%</strong> &nbsp;&middot;&nbsp; <strong style="color:#b91c1c">Poor &lt;75%</strong></p>
+      <p class="meta">Score Key: <strong style="color:#15803d">Good — 90 and above</strong> &nbsp;&middot;&nbsp; <strong style="color:#a16207">Fair — 75 to 89</strong> &nbsp;&middot;&nbsp; <strong style="color:#b91c1c">Poor — below 75</strong></p>
     </div>
 
     <div class="three-col">
@@ -259,7 +256,7 @@ const printRiskReport = (risks, scopedSchools, selectedLevel) => {
   const now = formatDate(new Date());
 
   const criteriaRows = [
-    ['Low Completeness Score', 'Schools scoring below 90%; critically flagged if below 75%'],
+    ['Low Completeness Score', 'Schools scoring below 90; critically flagged if below 75'],
     ['Below Minimum Stock',    'One or more items have fallen below the required stock level'],
     ['Stale Data',             'Inventory records not updated within the last 30 days'],
     ['Score Decline',          'Completeness score dropped significantly since the last period'],
@@ -397,7 +394,7 @@ const BuiltInAI = {
     if (p.isStale && p.hasLowStock) return 'Stale records combined with low stock indicate possible data neglect.';
     if (p.isStale) return 'Inventory data has not been updated in over 30 days.';
     if (p.hasLowStock) return `${p.lowStockItems} item(s) are below the minimum required stock level.`;
-    if (trend < -5) return `Completeness score dropped ${Math.abs(Math.round(trend))}% since last period.`;
+    if (trend < -5) return `Completeness score dropped ${Math.abs(Math.round(trend))} points since last period.`;
     return 'Moderate risk — completeness score below division average.';
   },
 
@@ -405,11 +402,11 @@ const BuiltInAI = {
     const p = schoolProfiles[school.id] || {};
     const flags = [];
     const trend = school.completenessScore - (p.prevScore || school.completenessScore);
-    if (school.completenessScore < 75) flags.push('Score below 75% threshold');
-    if (school.completenessScore < 90) flags.push('Score below 90% target');
+    if (school.completenessScore < 75) flags.push('Score below 75 threshold');
+    if (school.completenessScore < 90) flags.push('Score below 90 target');
     if (p.hasLowStock) flags.push(`${p.lowStockItems} low-stock item(s)`);
     if (p.isStale) flags.push('No update in 30+ days');
-    if (trend < -5) flags.push(`Score dropped ${Math.abs(Math.round(trend))}% recently`);
+    if (trend < -5) flags.push(`Score dropped ${Math.abs(Math.round(trend))} points recently`);
     if (trend < -10) flags.push('Significant score decline detected');
     if (!flags.length) flags.push('Borderline completeness score');
     return flags;
@@ -448,38 +445,38 @@ const BuiltInAI = {
     else if (avg < 90) overallHealth = 'Fair';
 
     const headlines = {
-      Good: `Inventory is in good shape with ${Math.round(avg)}% average completeness across ${schoolList.length} school(s).`,
-      Fair: `Average is ${Math.round(avg)}% — ${lowCount} school(s) need attention to reach the 90% target.`,
-      Poor: `Poor standing: average completeness is only ${Math.round(avg)}% with ${lowCount} school(s) below the 75% threshold.`,
+      Good: `Inventory is in good shape with ${Math.round(avg)} average completeness across ${schoolList.length} school(s).`,
+      Fair: `Average is ${Math.round(avg)} — ${lowCount} school(s) need attention to reach the target of 90.`,
+      Poor: `Poor standing: average completeness is only ${Math.round(avg)} with ${lowCount} school(s) below the threshold of 75.`,
     };
 
     const topPriorities = [];
-    if (lowCount > 0) topPriorities.push(`Bring ${lowCount} school(s) with score below 75% up to minimum standard`);
+    if (lowCount > 0) topPriorities.push(`Bring ${lowCount} school(s) with score below 75 up to minimum standard`);
     if (staleCount > 0) topPriorities.push(`Follow up with ${staleCount} school(s) that have not updated data in 30+ days`);
     if (lowStockCount > 0) topPriorities.push(`Process transfer requests for ${lowStockCount} school(s) with low stock`);
-    if (topPriorities.length < 3) topPriorities.push('Push all schools to reach the 90% completeness target');
+    if (topPriorities.length < 3) topPriorities.push('Push all schools to reach the completeness target of 90');
     if (topPriorities.length < 3) topPriorities.push('Establish a monthly inventory update deadline for all schools');
 
     const strengths = [];
-    if (highCount > schoolList.length * 0.5) strengths.push(`Majority of schools (${highCount}) are above the 90% completeness target`);
+    if (highCount > schoolList.length * 0.5) strengths.push(`Majority of schools (${highCount}) are above the completeness target of 90`);
     if (improving > schoolList.length * 0.4) strengths.push(`${improving} school(s) showed improvement vs. previous period`);
-    if (avg >= 85) strengths.push(`Average of ${Math.round(avg)}% is above the 85% benchmark`);
+    if (avg >= 85) strengths.push(`Average of ${Math.round(avg)} is above the benchmark of 85`);
     if (!strengths.length) strengths.push('Some schools are maintaining consistent update schedules');
     if (strengths.length < 2) strengths.push('SDO oversight processes are helping identify issues early');
 
     const sorted = [...schoolList].sort((a, b) => a.completenessScore - b.completenessScore);
     const immediateActions = sorted.slice(0, 3).map((s) => {
       const p = schoolProfiles[s.id] || {};
-      if (s.completenessScore < 75) return `Visit ${s.name} (${s.completenessScore}%) to complete missing inventory data`;
+      if (s.completenessScore < 75) return `Visit ${s.name} (${s.completenessScore}) to complete missing inventory data`;
       if (p.isStale) return `Send urgent reminder to ${s.name} to update stale inventory records`;
       if (p.hasLowStock) return `Initiate transfer to ${s.name} to replenish ${p.lowStockItems} low-stock item(s)`;
-      return `Follow up with ${s.name} to improve completeness from ${s.completenessScore}%`;
+      return `Follow up with ${s.name} to improve completeness from ${s.completenessScore}`;
     });
 
     const insights = {
-      Good: `The selected group is performing well overall. Focus resources on the ${lowCount > 0 ? lowCount + ' underperforming school(s)' : 'few remaining gaps'} to bring everyone above 90%. Regular monitoring and a standardized update schedule will sustain this performance.`,
-      Fair: `With ${Math.round(avg)}% average completeness, the group is progressing but needs targeted follow-ups. Prioritize the ${lowCount} school(s) below 75% as they carry the most risk. A structured reporting cycle will prevent further score drops.`,
-      Poor: `Immediate intervention is required across multiple schools. The ${Math.round(avg)}% average suggests systemic data submission issues. Coordinate a group-wide inventory update drive with direct assistance to the lowest-scoring schools.`,
+      Good: `The selected group is performing well overall. Focus resources on the ${lowCount > 0 ? lowCount + ' underperforming school(s)' : 'few remaining gaps'} to bring everyone above 90. Regular monitoring and a standardized update schedule will sustain this performance.`,
+      Fair: `With ${Math.round(avg)} average completeness, the group is progressing but needs targeted follow-ups. Prioritize the ${lowCount} school(s) below 75 as they carry the most risk. A structured reporting cycle will prevent further score drops.`,
+      Poor: `Immediate intervention is required across multiple schools. The ${Math.round(avg)} average suggests systemic data submission issues. Coordinate a group-wide inventory update drive with direct assistance to the lowest-scoring schools.`,
     };
 
     return {
@@ -536,7 +533,7 @@ const printSchoolsReport = (data, { levelFilter, scoreFilter, searchQuery } = {}
   const scopeLabel = [
     levelFilter && levelFilter !== 'all' ? `Level: ${levelFilter}` : 'All Levels',
     scoreFilter && scoreFilter !== 'all'
-      ? scoreFilter === 'high' ? 'Score: Good (≥90%)' : scoreFilter === 'medium' ? 'Score: Fair (75–89%)' : 'Score: Poor (<75%)'
+      ? scoreFilter === 'high' ? 'Score: Good (90 and above)' : scoreFilter === 'medium' ? 'Score: Fair (75 to 89)' : 'Score: Poor (below 75)'
       : null,
     searchQuery ? `Search: "${searchQuery}"` : null,
   ].filter(Boolean).join(' · ');
@@ -556,7 +553,7 @@ const printSchoolsReport = (data, { levelFilter, scoreFilter, searchQuery } = {}
         <td style="padding:7px 10px;color:#6b7280">${s.level}</td>
         <td style="padding:7px 10px;color:#6b7280">${new Date(s.lastUpdated).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
         <td style="padding:7px 10px;text-align:center">
-          <span style="font-weight:700;font-size:12px;color:${scoreColor}">${s.completenessScore}%</span>
+          <span style="font-weight:700;font-size:12px;color:${scoreColor}">${s.completenessScore}</span>
         </td>
         <td style="padding:7px 10px;text-align:center">
           <span style="display:inline-block;background:${pillBg};color:${scoreColor};font-size:10px;font-weight:600;padding:2px 10px;border-radius:999px">${lbl}</span>
@@ -581,35 +578,25 @@ const printSchoolsReport = (data, { levelFilter, scoreFilter, searchQuery } = {}
       .no-print { display: none !important; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
-
-    /* ── Top action bar ── */
     .action-bar { display: flex; gap: 8px; margin-bottom: 28px; align-items: center; }
     .btn { cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 500; border-radius: 7px; padding: 7px 18px; transition: background 0.15s; }
     .btn-primary { background: #111; color: #fff; border: 1px solid #111; }
     .btn-primary:hover { background: #333; }
     .btn-secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; }
     .btn-secondary:hover { background: #f9fafb; }
-
-    /* ── Report header ── */
     .header { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 16px; border-bottom: 2px solid #111; margin-bottom: 20px; }
     .header-title { font-size: 20px; font-weight: 800; line-height: 1.15; }
     .header-sub { font-size: 11px; color: #6b7280; margin-top: 3px; }
     .header-meta { text-align: right; }
     .header-meta p { font-size: 10px; color: #6b7280; margin-bottom: 2px; }
     .header-meta strong { color: #111; }
-
-    /* ── Summary cards ── */
     .summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
     .sum-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; }
     .sum-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #9ca3af; margin-bottom: 3px; }
     .sum-value { font-size: 20px; font-weight: 800; line-height: 1; }
-
-    /* ── Scope pill ── */
     .scope-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
     .scope-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #9ca3af; }
     .scope-pill { background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 5px; padding: 3px 10px; font-size: 10px; font-weight: 500; color: #374151; }
-
-    /* ── Table ── */
     .table-wrap { border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
     table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
     thead tr { background: #f3f4f6; }
@@ -617,25 +604,18 @@ const printSchoolsReport = (data, { levelFilter, scoreFilter, searchQuery } = {}
     tbody tr:last-child td { border-bottom: none; }
     tfoot tr { background: #f9fafb; border-top: 1px solid #e5e7eb; }
     tfoot td { padding: 7px 10px; font-size: 10px; color: #9ca3af; }
-
-    /* ── Score key ── */
     .key-row { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
     .key-item { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 500; }
     .key-dot { width: 8px; height: 8px; border-radius: 50%; }
-
-    /* ── Footer ── */
     .footer { margin-top: 24px; display: flex; justify-content: space-between; font-size: 9px; color: #9ca3af; padding-top: 10px; border-top: 1px solid #f3f4f6; }
   </style>
 </head>
 <body>
-  <!-- Action bar (hidden on print) -->
   <div class="action-bar no-print">
     <button class="btn btn-primary" onclick="window.print()">🖨&nbsp; Print / Save as PDF</button>
     <button class="btn btn-secondary" onclick="window.close()">Close</button>
     <span style="font-size:10px;color:#9ca3af;margin-left:4px">Tip: Set paper to <strong>A4 Landscape</strong> for best fit</span>
   </div>
-
-  <!-- Report header -->
   <div class="header">
     <div>
       <div class="header-title">Schools Directory Report</div>
@@ -644,41 +624,20 @@ const printSchoolsReport = (data, { levelFilter, scoreFilter, searchQuery } = {}
     <div class="header-meta">
       <p>Generated: <strong>${now}</strong></p>
       <p>Total schools shown: <strong>${data.length}</strong></p>
-      <p>Division Avg: <strong>${avgScore}%</strong></p>
+      <p>Division Avg: <strong>${avgScore}</strong></p>
     </div>
   </div>
-
-  <!-- Summary stats -->
   <div class="summary">
-    <div class="sum-card">
-      <div class="sum-label">Total Shown</div>
-      <div class="sum-value">${data.length}</div>
-    </div>
-    <div class="sum-card">
-      <div class="sum-label">Good ≥ 90%</div>
-      <div class="sum-value" style="color:#15803d">${goodCount}</div>
-    </div>
-    <div class="sum-card">
-      <div class="sum-label">Fair 75–89%</div>
-      <div class="sum-value" style="color:#a16207">${fairCount}</div>
-    </div>
-    <div class="sum-card">
-      <div class="sum-label">Poor &lt; 75%</div>
-      <div class="sum-value" style="color:#b91c1c">${poorCount}</div>
-    </div>
-    <div class="sum-card">
-      <div class="sum-label">Avg. Score</div>
-      <div class="sum-value" style="color:${avgScore >= 90 ? '#15803d' : avgScore >= 75 ? '#a16207' : '#b91c1c'}">${avgScore}%</div>
-    </div>
+    <div class="sum-card"><div class="sum-label">Total Shown</div><div class="sum-value">${data.length}</div></div>
+    <div class="sum-card"><div class="sum-label">Good — 90 and above</div><div class="sum-value" style="color:#15803d">${goodCount}</div></div>
+    <div class="sum-card"><div class="sum-label">Fair — 75 to 89</div><div class="sum-value" style="color:#a16207">${fairCount}</div></div>
+    <div class="sum-card"><div class="sum-label">Poor — below 75</div><div class="sum-value" style="color:#b91c1c">${poorCount}</div></div>
+    <div class="sum-card"><div class="sum-label">Avg. Score</div><div class="sum-value" style="color:${avgScore >= 90 ? '#15803d' : avgScore >= 75 ? '#a16207' : '#b91c1c'}">${avgScore}</div></div>
   </div>
-
-  <!-- Scope -->
   <div class="scope-row">
     <span class="scope-label">Active Filters</span>
     <span class="scope-pill">${scopeLabel}</span>
   </div>
-
-  <!-- Table -->
   <div class="table-wrap">
     <table>
       <thead>
@@ -694,20 +653,17 @@ const printSchoolsReport = (data, { levelFilter, scoreFilter, searchQuery } = {}
       <tbody>${tableRows}</tbody>
       <tfoot>
         <tr>
-          <td colspan="6">${data.length} school${data.length !== 1 ? 's' : ''} · Avg completeness: ${avgScore}% · Generated ${now}</td>
+          <td colspan="6">${data.length} school${data.length !== 1 ? 's' : ''} · Avg completeness: ${avgScore} · Generated ${now}</td>
         </tr>
       </tfoot>
     </table>
   </div>
-
-  <!-- Score key -->
   <div class="key-row">
     <span style="font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.08em">Score Key:</span>
-    <span class="key-item"><span class="key-dot" style="background:#22c55e"></span><span style="color:#15803d">Good — 90 to 100%</span></span>
-    <span class="key-item"><span class="key-dot" style="background:#eab308"></span><span style="color:#a16207">Fair — 75 to 89%</span></span>
-    <span class="key-item"><span class="key-dot" style="background:#ef4444"></span><span style="color:#b91c1c">Poor — Below 75%</span></span>
+    <span class="key-item"><span class="key-dot" style="background:#22c55e"></span><span style="color:#15803d">Good — 90 to 100</span></span>
+    <span class="key-item"><span class="key-dot" style="background:#eab308"></span><span style="color:#a16207">Fair — 75 to 89</span></span>
+    <span class="key-item"><span class="key-dot" style="background:#ef4444"></span><span style="color:#b91c1c">Poor — Below 75</span></span>
   </div>
-
   <div class="footer">
     <span>Schools Division Office &mdash; For Official Use Only</span>
     <span>Schools Directory &middot; ${now}</span>
@@ -722,8 +678,8 @@ const ScoreTrend = ({ current, previous }) => {
   const diff = current - (previous ?? current);
   if (Math.abs(diff) < 1) return <Minus className="w-3.5 h-3.5 text-muted-foreground" />;
   if (diff > 0)
-    return <span className="flex items-center gap-0.5 text-success text-[11px] font-semibold"><TrendingUp className="w-3 h-3" />+{Math.round(diff)}%</span>;
-  return <span className="flex items-center gap-0.5 text-destructive text-[11px] font-semibold"><TrendingDown className="w-3 h-3" />{Math.round(diff)}%</span>;
+    return <span className="flex items-center gap-0.5 text-success text-[11px] font-semibold"><TrendingUp className="w-3 h-3" />+{Math.round(diff)}</span>;
+  return <span className="flex items-center gap-0.5 text-destructive text-[11px] font-semibold"><TrendingDown className="w-3 h-3" />{Math.round(diff)}</span>;
 };
 
 // ─── Sortable Head ────────────────────────────────────────────────────────────
@@ -835,17 +791,9 @@ const AIHealthAdvisorModal = ({ onClose }) => {
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary/8 flex items-center justify-center">
-              <Brain className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold leading-none">AI Smart Insights</h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Automated inventory analysis</p>
-            </div>
-          </div>
-          <span className="text-[10px] font-medium px-2 py-1 rounded-md bg-primary/8 text-primary">Built-in AI</span>
+        <div className="px-6 py-4 border-b border-border flex items-center gap-3">
+          <Brain className="w-4 h-4 text-primary" />
+          <h2 className="text-sm font-semibold">Smart Insights</h2>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -862,14 +810,10 @@ const AIHealthAdvisorModal = ({ onClose }) => {
           <div className="px-6 py-5 space-y-5">
             {/* Ready state */}
             {!loading && !result && !error && (
-              <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
-                <div className="w-12 h-12 rounded-xl bg-primary/8 flex items-center justify-center">
-                  <Brain className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Analyze {scopedSchools.length} {selectedLevel === 'all' ? '' : selectedLevel} school{scopedSchools.length !== 1 ? 's' : ''}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Get a insights overview with priorities and action items</p>
-                </div>
+              <div className="flex flex-col items-center gap-3 py-8 text-center">
+                <p className="text-xs text-muted-foreground">
+                  {scopedSchools.length} school{scopedSchools.length !== 1 ? 's' : ''} in scope
+                </p>
                 <Button onClick={run} size="sm" className="gap-2 h-8 px-4" disabled={scopedSchools.length === 0}>
                   <ScanSearch className="w-3.5 h-3.5" />Run Analysis
                 </Button>
@@ -885,7 +829,7 @@ const AIHealthAdvisorModal = ({ onClose }) => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">Analyzing {scopedSchools.length} school{scopedSchools.length !== 1 ? 's' : ''}…</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Computing insights scores and generating reports</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Computing scores and generating insights</p>
                   </div>
                 </div>
                 <LoadingBar color="bg-primary" />
@@ -909,25 +853,23 @@ const AIHealthAdvisorModal = ({ onClose }) => {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${hc.dot}`} />
-                      <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Overall Insights</span>
+                      <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Overall Status</span>
                     </div>
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${hc.pill}`}>
                       {result.overallHealth}
                     </span>
                   </div>
                   <p className="text-sm text-foreground leading-relaxed">{result.headline}</p>
-                  {/* Score key inline */}
                   <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border/50">
                     <span className="text-[10px] text-muted-foreground">Key:</span>
-                    <span className="text-[10px] text-success font-semibold">Good ≥ 90%</span>
-                    <span className="text-[10px] text-warning font-semibold">Fair 75–89%</span>
-                    <span className="text-[10px] text-destructive font-semibold">Poor &lt; 75%</span>
+                    <span className="text-[10px] text-success font-semibold">Good — 90 and above</span>
+                    <span className="text-[10px] text-warning font-semibold">Fair — 75 to 89</span>
+                    <span className="text-[10px] text-destructive font-semibold">Poor — below 75</span>
                   </div>
                 </div>
 
                 {/* Three columns */}
                 <div className="grid grid-cols-3 gap-3">
-                  {/* Priorities */}
                   <div className="space-y-2">
                     <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <Target className="w-3.5 h-3.5" />Priorities
@@ -942,7 +884,6 @@ const AIHealthAdvisorModal = ({ onClose }) => {
                     </ul>
                   </div>
 
-                  {/* Strengths */}
                   <div className="space-y-2">
                     <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <CheckCircle className="w-3.5 h-3.5 text-success" />Strengths
@@ -957,7 +898,6 @@ const AIHealthAdvisorModal = ({ onClose }) => {
                     </ul>
                   </div>
 
-                  {/* Act Now */}
                   <div className="space-y-2">
                     <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <Zap className="w-3.5 h-3.5 text-warning" />Act Now
@@ -1011,32 +951,6 @@ const AIHealthAdvisorModal = ({ onClose }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Risk Radar Detection Criteria — shown before scan
-// ─────────────────────────────────────────────────────────────────────────────
-const RISK_CRITERIA = [
-  {
-    icon: <TrendingDown className="w-3.5 h-3.5" />,
-    label: 'Low Completeness Score',
-    desc: 'Schools scoring below 90%, with critical flags for those under 75%',
-  },
-  {
-    icon: <Package className="w-3.5 h-3.5" />,
-    label: 'Below Minimum Stock',
-    desc: 'Items that have fallen below the required stock level threshold',
-  },
-  {
-    icon: <Clock className="w-3.5 h-3.5" />,
-    label: 'Stale Data',
-    desc: 'Inventory records not updated within the last 30 days',
-  },
-  {
-    icon: <TrendingDown className="w-3.5 h-3.5" />,
-    label: 'Score Decline',
-    desc: 'Completeness scores that have dropped significantly since the last period',
-  },
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
 // AI Risk Radar Modal
 // ─────────────────────────────────────────────────────────────────────────────
 const AIRiskScannerModal = ({ onClose, onViewSchool }) => {
@@ -1069,17 +983,9 @@ const AIRiskScannerModal = ({ onClose, onViewSchool }) => {
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-destructive/8 flex items-center justify-center">
-              <ShieldAlert className="w-4 h-4 text-destructive" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold leading-none">AI Risk Radar</h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Identifies the top 5 highest-risk schools</p>
-            </div>
-          </div>
-          <span className="text-[10px] font-medium px-2 py-1 rounded-md bg-primary/8 text-primary">Built-in AI</span>
+        <div className="px-6 py-4 border-b border-border flex items-center gap-3">
+          <ShieldAlert className="w-4 h-4 text-destructive" />
+          <h2 className="text-sm font-semibold">Risk Radar</h2>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -1096,35 +1002,13 @@ const AIRiskScannerModal = ({ onClose, onViewSchool }) => {
           <div className="px-6 py-5 space-y-4">
             {/* Ready state */}
             {!loading && !risks && !error && (
-              <div className="space-y-5">
-                {/* What does Risk Radar detect? */}
-                <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">What Risk Radar Detects</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Risk Radar scans all schools in the selected scope and assigns a composite risk score based on four signals. The five schools with the highest scores are surfaced for your attention.
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    {RISK_CRITERIA.map((c, i) => (
-                      <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-background border border-border">
-                        <span className="text-muted-foreground mt-0.5 flex-shrink-0">{c.icon}</span>
-                        <div>
-                          <p className="text-xs font-medium leading-tight">{c.label}</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{c.desc}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-center gap-3 py-4 text-center">
-                  <p className="text-xs text-muted-foreground">{scopedSchools.length} school{scopedSchools.length !== 1 ? 's' : ''} in scope</p>
-                  <Button onClick={run} variant="destructive" size="sm" className="gap-2 h-8 px-4" disabled={scopedSchools.length === 0}>
-                    <ScanSearch className="w-3.5 h-3.5" />Run Risk Scan
-                  </Button>
-                </div>
+              <div className="flex flex-col items-center gap-3 py-8 text-center">
+                <p className="text-xs text-muted-foreground">
+                  {scopedSchools.length} school{scopedSchools.length !== 1 ? 's' : ''} in scope
+                </p>
+                <Button onClick={run} variant="destructive" size="sm" className="gap-2 h-8 px-4" disabled={scopedSchools.length === 0}>
+                  <ScanSearch className="w-3.5 h-3.5" />Run Risk Scan
+                </Button>
               </div>
             )}
 
@@ -1179,17 +1063,13 @@ const AIRiskScannerModal = ({ onClose, onViewSchool }) => {
                     const lc = levelConfig[risk.riskLevel] || levelConfig.Medium;
                     return (
                       <div key={i} className="rounded-lg border border-border bg-muted/10 overflow-hidden">
-                        {/* Row */}
                         <button
                           className="w-full p-3.5 flex items-center gap-3 text-left hover:bg-muted/20 transition-colors"
                           onClick={() => setExpanded(isOpen ? null : i)}
                         >
-                          {/* Rank */}
                           <span className={`w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${lc.rank}`}>
                             {i + 1}
                           </span>
-
-                          {/* Info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-medium truncate">{risk.schoolName}</p>
@@ -1199,24 +1079,19 @@ const AIRiskScannerModal = ({ onClose, onViewSchool }) => {
                             </div>
                             <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{risk.primaryRisk}</p>
                           </div>
-
-                          {/* Score + bar */}
                           <div className="w-12 flex-shrink-0 text-right space-y-1">
                             <p className="text-sm font-bold">{risk.riskScore}</p>
                             <div className="h-1 rounded-full bg-muted overflow-hidden">
                               <div className={`h-full rounded-full ${lc.bar}`} style={{ width: `${risk.riskScore}%` }} />
                             </div>
                           </div>
-
                           {isOpen
                             ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                             : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
                         </button>
 
-                        {/* Expanded */}
                         {isOpen && (
                           <div className="px-4 pb-4 pt-3 border-t border-border/60 space-y-3">
-                            {/* Flags */}
                             <div className="flex flex-wrap gap-1.5">
                               {(risk.flags || []).map((flag, fi) => (
                                 <span key={fi} className="text-[11px] px-2.5 py-1 rounded-full bg-background border border-border text-muted-foreground">
@@ -1224,13 +1099,10 @@ const AIRiskScannerModal = ({ onClose, onViewSchool }) => {
                                 </span>
                               ))}
                             </div>
-
-                            {/* Recommendation */}
                             <div className="rounded-lg bg-muted/30 border border-border p-3">
                               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Recommendation</p>
                               <p className="text-xs text-foreground leading-relaxed">{risk.recommendation}</p>
                             </div>
-
                             <div className="flex justify-end">
                               <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5"
                                 onClick={() => {
@@ -1317,7 +1189,7 @@ const SchoolProfileModal = ({ school, onClose, onViewInventory, onQuickTransfer 
             <p className="text-sm font-semibold text-muted-foreground mb-2">Inventory Completeness</p>
             <div className="flex items-center gap-3 flex-wrap">
               <div className={`px-4 py-2 rounded-xl border flex items-center gap-2 ${labelColor}`}>
-                <span className="text-2xl font-display font-bold">{school.completenessScore}%</span>
+                <span className="text-2xl font-display font-bold">{school.completenessScore}</span>
                 <span className="text-xs font-semibold">{label}</span>
                 {school.completenessScore >= 90 && <CheckCircle className="w-4 h-4" />}
               </div>
@@ -1326,11 +1198,11 @@ const SchoolProfileModal = ({ school, onClose, onViewInventory, onQuickTransfer 
             </div>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               <span className="text-[10px] text-muted-foreground">Key:</span>
-              <span className="text-[10px] text-success font-semibold">Good ≥ 90%</span>
+              <span className="text-[10px] text-success font-semibold">Good — 90 and above</span>
               <span className="text-[10px] text-muted-foreground">·</span>
-              <span className="text-[10px] text-warning font-semibold">Fair 75–89%</span>
+              <span className="text-[10px] text-warning font-semibold">Fair — 75 to 89</span>
               <span className="text-[10px] text-muted-foreground">·</span>
-              <span className="text-[10px] text-destructive font-semibold">Poor &lt; 75%</span>
+              <span className="text-[10px] text-destructive font-semibold">Poor — below 75</span>
             </div>
             <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
               <div
@@ -1477,12 +1349,8 @@ const Schools = () => {
         </TableCell>
         <TableCell>
           <div className="flex items-center justify-center gap-2">
-            <div className={`px-3 py-1 rounded-full ${getScoreBackground(school.completenessScore)}`}>
-              <span className={`font-semibold ${getScoreColor(school.completenessScore)}`}>{school.completenessScore}%</span>
-            </div>
             <ScoreStatusBadge score={school.completenessScore} />
             {school.completenessScore >= 95 && <CheckCircle className="w-4 h-4 text-success" />}
-            <ScoreTrend current={school.completenessScore} previous={profile.prevScore || school.completenessScore} />
           </div>
         </TableCell>
         <TableCell>
@@ -1529,7 +1397,7 @@ const Schools = () => {
           </div>
           <div className="stat-card">
             <TrendingUp className="w-5 h-5 text-success mb-2" />
-            <p className="text-2xl font-display font-bold">{avgCompleteness}%</p>
+            <p className="text-2xl font-display font-bold">{avgCompleteness}</p>
             <p className="text-sm text-muted-foreground">Avg. Completeness</p>
           </div>
         </div>
@@ -1538,52 +1406,31 @@ const Schools = () => {
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-xs text-muted-foreground font-medium">Completeness Key:</span>
           <span className="flex items-center gap-1.5 text-xs font-semibold text-success">
-            <span className="w-2 h-2 rounded-full bg-success inline-block" />Good — 90–100%
+            <span className="w-2 h-2 rounded-full bg-success inline-block" />Good — 90 to 100
           </span>
           <span className="flex items-center gap-1.5 text-xs font-semibold text-warning">
-            <span className="w-2 h-2 rounded-full bg-warning inline-block" />Fair — 75–89%
+            <span className="w-2 h-2 rounded-full bg-warning inline-block" />Fair — 75 to 89
           </span>
           <span className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
-            <span className="w-2 h-2 rounded-full bg-destructive inline-block" />Poor — below 75%
+            <span className="w-2 h-2 rounded-full bg-destructive inline-block" />Poor — below 75
           </span>
         </div>
 
         {/* ── AI Tools ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Smart Insights */}
+        <div className="flex gap-2">
           <button
             onClick={() => setShowHealthAdvisor(true)}
-            className="group text-left rounded-xl border border-border bg-muted/20 hover:bg-muted/40 transition-all p-4 flex items-center gap-4"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 transition-all text-sm font-medium"
           >
-            <div className="w-10 h-10 rounded-lg bg-primary/8 flex items-center justify-center flex-shrink-0">
-              <Brain className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <p className="text-sm font-semibold">AI Smart Insights</p>
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/8 text-primary">Built-in AI</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Insights overview with priorities, strengths, and action items.</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+            <Brain className="w-4 h-4 text-primary" />
+            Smart Insights
           </button>
-
-          {/* Risk Radar */}
           <button
             onClick={() => setShowRiskScanner(true)}
-            className="group text-left rounded-xl border border-border bg-muted/20 hover:bg-muted/40 transition-all p-4 flex items-center gap-4"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 transition-all text-sm font-medium"
           >
-            <div className="w-10 h-10 rounded-lg bg-destructive/8 flex items-center justify-center flex-shrink-0">
-              <ShieldAlert className="w-5 h-5 text-destructive" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <p className="text-sm font-semibold">AI Risk Radar</p>
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/8 text-primary">Built-in AI</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Surfaces the 5 highest-risk schools by completeness, stock, and data freshness.</p>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+            <ShieldAlert className="w-4 h-4 text-destructive" />
+            Risk Radar
           </button>
         </div>
 
@@ -1634,9 +1481,9 @@ const Schools = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Scores</SelectItem>
-                <SelectItem value="high">Good (≥ 90%)</SelectItem>
-                <SelectItem value="medium">Fair (75–89%)</SelectItem>
-                <SelectItem value="low">Poor (&lt; 75%)</SelectItem>
+                <SelectItem value="high">Good (90 and above)</SelectItem>
+                <SelectItem value="medium">Fair (75 to 89)</SelectItem>
+                <SelectItem value="low">Poor (below 75)</SelectItem>
               </SelectContent>
             </Select>
           </div>
