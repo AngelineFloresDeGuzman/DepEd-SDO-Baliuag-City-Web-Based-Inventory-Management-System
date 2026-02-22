@@ -75,7 +75,7 @@ const Reports = () => {
     },
     {
       id: 'rcpi',
-      title: 'RCPI (Appendix 66)',
+      title: 'RPCI (Appendix 66)',
       description: 'Report on the Physical Count of Inventories',
       icon: FileText,
       color: 'text-primary',
@@ -337,21 +337,13 @@ const Reports = () => {
 
             {/* Action Buttons */}
             <div className="flex gap-2 ml-auto">
-              <Button
-                size="sm"
-                className="bg-yellow-400 hover:bg-yellow-500 text-black"
-                onClick={handleGenerateReport}
-              >
+              <Button onClick={handleGenerateReport} className="bg-warning hover:bg-warning/90">
                 <Download className="w-4 h-4 mr-2" />
-                Export Report
+                Generate PDF Report
               </Button>
-              <Button
-                size="sm"
-                className="bg-yellow-400 hover:bg-yellow-500 text-black"
-                onClick={handlePrintPreview}
-              >
+              <Button variant="outline" onClick={handlePrintPreview} className="bg-warning hover:bg-warning/90 border-warning text-foreground">
                 <Printer className="w-4 h-4 mr-2" />
-                Print Report
+                Print Preview
               </Button>
             </div>
           </div>
