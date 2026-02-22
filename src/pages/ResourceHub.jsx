@@ -36,26 +36,21 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Search,
   Package,
-  ArrowRight,
   Building2,
   CheckCircle,
   Warehouse,
-  ClipboardList,
   Eye,
   Clock,
   XCircle,
   ArrowLeftRight,
   TrendingUp,
-  Heart,
   AlertCircle,
   Lightbulb,
   BookOpen,
   Zap,
-  History,
-  Truck,
   Loader2,
   Check,
-  X,
+  Gift,
 } from 'lucide-react';
 
 const SDO_SCHOOL = { id: 'sdo', name: 'Schools Division Office of City of Baliuag' };
@@ -64,40 +59,22 @@ const ResourceHub = () => {
   const { user } = useAuth();
   const { rawInventory, updateRawEntry } = useRawInventory();
   const { getSchoolInventory } = useSchoolInventory();
-  const schoolInventory = user?.schoolId ? getSchoolInventory(user.schoolId) : [];
   const { addTransfer, transfers, updateTransferStatus } = useTransfers();
   const { addNotification } = useNotifications();
   const isAdmin = user?.role === 'sdo_admin';
 
+  // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [requestSource, setRequestSource] = useState(null); // SDO warehouse source only
-  const [requestQuantity, setRequestQuantity] = useState(1);
-  const [requestReason, setRequestReason] = useState('');
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [requestUrgency, setRequestUrgency] = useState('normal'); // 'normal' | 'urgent' | 'critical'
-  const [viewRequestHistory, setViewRequestHistory] = useState(false);
 
   // Public transfer log (transparency) — view only
   const [selectedTransferView, setSelectedTransferView] = useState(null);
   
-  // For approve/reject dialog
-  const [showApproveRejectDialog, setShowApproveRejectDialog] = useState(false);
-  const [selectedTransfer, setSelectedTransfer] = useState(null);
-  const [actionType, setActionType] = useState(null); // 'approve' or 'reject'
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [processingTransfer, setProcessingTransfer] = useState(false);
-
   // For mark as received dialog
   const [showMarkReceivedDialog, setShowMarkReceivedDialog] = useState(false);
   const [transferToMarkReceived, setTransferToMarkReceived] = useState(null);
   const [receivedNotes, setReceivedNotes] = useState('');
   const [processingReceived, setProcessingReceived] = useState(false);
-
-  // For cancel request confirmation dialog
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [transferToCancel, setTransferToCancel] = useState(null);
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -150,6 +127,13 @@ const ResourceHub = () => {
             Received
           </Badge>
         );
+      case 'Allocated':
+        return (
+          <Badge className="bg-primary/20 text-primary border-0">
+            <Gift className="w-3 h-3 mr-1" />
+            Allocated
+          </Badge>
+        );
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -182,47 +166,25 @@ const ResourceHub = () => {
     [rawInventory, searchQuery, categoryFilter]
   );
 
-  const pendingRequests = useMemo(
-    () => transfers.filter((t) => t.schoolId === 'sdo' && t.status?.includes('Pending')),
-    [transfers]
-  );
-
-  // ===== NEW: Statistics & Insights =====
+  // Statistics
   const stats = useMemo(() => {
     const totalItemsAvailable = filteredRaw.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const schoolRequests = transfers.filter((t) => t.targetSchoolId === user?.schoolId);
-    const requestsByItem = {};
-    transfers.forEach((t) => {
-      t.items?.forEach((item) => {
-        requestsByItem[item.itemName] = (requestsByItem[item.itemName] || 0) + item.quantity;
-      });
-    });
-    const mostRequested = Object.entries(requestsByItem)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3)
-      .map(([name]) => name);
-
     return {
       totalItemsAvailable,
-      totalPendingRequests: pendingRequests.length,
-      schoolRequestCount: schoolRequests.length,
-      mostRequested,
       totalCompletedTransfers: transfers.filter(t => t.status === 'Received' || t.status === 'In Transit' || t.status === 'Approved').length,
       totalAllTransfers: transfers.length,
     };
-  }, [filteredRaw, transfers, pendingRequests, user?.schoolId]);
+  }, [filteredRaw, transfers]);
 
-  // ===== NEW: Request history for schools =====
-  const myRequestHistory = useMemo(() => {
+  // My Allocations - items allocated to this school by SDO
+  const myAllocations = useMemo(() => {
     if (!user?.schoolId || isAdmin) return [];
     return transfers
-      .filter((t) => t.targetSchoolId === user.schoolId)
+      .filter((t) => t.targetSchoolId === user.schoolId && (t.type === 'Allocation' || t.status === 'Allocated'))
       .sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [transfers, user?.schoolId, isAdmin]);
 
-
-
-  // ===== NEW: Sample announcements (would come from a context in production) =====
+  // Sample announcements
   const announcements = [
     {
       id: 1,
@@ -232,138 +194,7 @@ const ResourceHub = () => {
       type: 'info',
       date: '2024-01-28',
     },
-    {
-      id: 2,
-      icon: 'alert',
-      title: 'Limited Supplies',
-      message: 'Office Supplies stock is running low. Place requests early!',
-      type: 'warning',
-      date: '2024-01-27',
-    },
   ];
-
-  const handleRequestSubmit = () => {
-    if (!selectedItem || !user?.schoolId) return;
-    const mySchool = schools.find((s) => s.id === user.schoolId);
-    if (!mySchool) return;
-
-    const itemName = selectedItem.name;
-    const itemId = selectedItem.itemId;
-    const maxQty = selectedItem.quantity;
-    const qty = Math.min(Math.max(1, requestQuantity), maxQty || 999);
-
-    const refNo = `TR-2024-${String(transfers.length + 1).padStart(3, '0')}`;
-    const transfer = {
-      id: `mov-tr-${Date.now()}`,
-      type: 'Transfer',
-      schoolId: SDO_SCHOOL.id,
-      schoolName: SDO_SCHOOL.name,
-      targetSchoolId: user.schoolId,
-      targetSchoolName: mySchool.name,
-      status: 'Pending - SDO Approval',
-      date: new Date().toISOString().split('T')[0],
-      refNo,
-      items: [{ itemId, itemName, quantity: qty }],
-      reason: requestReason.trim() || 'Resource Hub request',
-      urgency: requestUrgency,
-      createdBy: user.uid,
-      createdAt: new Date().toISOString(),
-    };
-    addTransfer(transfer);
-    addNotification({
-      title: 'New transfer request',
-      message: `${mySchool.name} requested ${qty}× ${itemName} from ${SDO_SCHOOL.name}.`,
-      type: 'request',
-      forAdmin: true,
-      transferId: transfer.id,
-    });
-    setSelectedItem(null);
-    setRequestSource(null);
-    setRequestQuantity(1);
-    setRequestReason('');
-    setRequestUrgency('normal');
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
-  };
-
-  const openRequestDialog = (item, source) => {
-    setSelectedItem(item);
-    setRequestSource(source);
-    setRequestQuantity(1);
-    setRequestReason('');
-  };
-
-  // Handle cancel request with confirmation
-  const handleCancelRequest = () => {
-    setShowCancelConfirm(true);
-  };
-
-  const confirmCancelRequest = () => {
-    setSelectedItem(null);
-    setRequestSource(null);
-    setRequestQuantity(1);
-    setRequestReason('');
-    setRequestUrgency('normal');
-    setShowCancelConfirm(false);
-  };
-
-  // Handle approve/reject actions
-  const handleApproveClick = (transfer) => {
-    setSelectedTransfer(transfer);
-    setActionType('approve');
-    setRejectionReason('');
-    setShowApproveRejectDialog(true);
-  };
-
-  const handleRejectClick = (transfer) => {
-    setSelectedTransfer(transfer);
-    setActionType('reject');
-    setRejectionReason('');
-    setShowApproveRejectDialog(true);
-  };
-
-  const handleApproveRejectConfirm = () => {
-    if (!selectedTransfer || !actionType) return;
-    
-    setProcessingTransfer(true);
-    
-    const newStatus = actionType === 'approve' ? 'In Transit' : 'Rejected';
-    const extraUpdates = actionType === 'reject' ? { rejectionReason: rejectionReason.trim() || 'Request rejected by SDO' } : {};
-    
-    setTimeout(() => {
-      updateTransferStatus(selectedTransfer.id, newStatus, extraUpdates);
-      
-      // Deduct quantity from SDO warehouse when approved
-      if (actionType === 'approve' && selectedTransfer.items) {
-        selectedTransfer.items.forEach((item) => {
-          const rawItem = rawInventory.find((r) => r.itemId === item.itemId || r.name === item.itemName);
-          if (rawItem) {
-            const newQty = Math.max(0, (rawItem.quantity || 0) - item.quantity);
-            updateRawEntry(rawItem.id, { quantity: newQty });
-          }
-        });
-      }
-      
-      addNotification({
-        title: actionType === 'approve' ? 'Transfer Approved' : 'Transfer Rejected',
-        message: actionType === 'approve' 
-          ? `${selectedTransfer.items?.map(i => i.itemName).join(', ')} approved for ${selectedTransfer.targetSchoolName}`
-          : `Transfer request rejected for ${selectedTransfer.targetSchoolName}`,
-        type: actionType === 'approve' ? 'approval' : 'rejection',
-        // Notify the requesting school and the requesting user directly so they receive the update
-        forAdmin: false,
-        forSchoolId: selectedTransfer.targetSchoolId,
-        forUserId: selectedTransfer.createdBy,
-        transferId: selectedTransfer.id,
-      });
-      
-      setProcessingTransfer(false);
-      setShowApproveRejectDialog(false);
-      setSelectedTransfer(null);
-      setActionType(null);
-      setRejectionReason('');
-    }, 500);
-  };
 
   // Handle mark as received
   const handleMarkReceivedClick = (transfer) => {
@@ -398,19 +229,120 @@ const ResourceHub = () => {
     }, 500);
   };
 
+  // SDO Admin allocation
+  const [allocateSelection, setAllocateSelection] = useState(null);
+  const [allocateSchool, setAllocateSchool] = useState('');
+  const [allocateQty, setAllocateQty] = useState(0);
+  
+  // Allocation method: 'manual' or 'bulk'
+  const [allocationMethod, setAllocationMethod] = useState('manual');
+  const [bulkTotalQty, setBulkTotalQty] = useState(0);
+  const [selectedSchools, setSelectedSchools] = useState([]);
+  const [bulkPerSchool, setBulkPerSchool] = useState(0);
+
+  // Calculate bulk even split allocation
+  const calculateBulkAllocation = () => {
+    if (bulkTotalQty > 0 && selectedSchools.length > 0) {
+      const perSchool = Math.floor(bulkTotalQty / selectedSchools.length);
+      setBulkPerSchool(perSchool);
+    } else {
+      setBulkPerSchool(0);
+    }
+  };
+
+  // Handle manual single school allocation
+  const handleAllocateToSchool = () => {
+    if (!allocateSelection || !allocateSchool || allocateQty <= 0) return;
+    const rawItem = rawInventory.find((r) => r.itemId === allocateSelection.itemId || r.id === allocateSelection.id);
+    if (!rawItem) return addNotification({ title: 'Allocation Failed', message: 'Selected resource not found', type: 'error', forAdmin: true });
+    const qty = Number(allocateQty);
+    if ((rawItem.quantity || 0) < qty) return addNotification({ title: 'Allocation Failed', message: 'Insufficient stock', type: 'error', forAdmin: true });
+
+    updateRawEntry(rawItem.id, { quantity: Math.max(0, (rawItem.quantity || 0) - qty) });
+
+    const allocation = {
+      id: `alloc-${Date.now()}`,
+      type: 'Allocation',
+      schoolId: SDO_SCHOOL.id,
+      schoolName: SDO_SCHOOL.name,
+      targetSchoolId: allocateSchool,
+      targetSchoolName: schools.find(s => s.id === allocateSchool)?.name || allocateSchool,
+      status: 'Allocated',
+      date: new Date().toISOString().split('T')[0],
+      refNo: `AL-${String(transfers.length + 1).padStart(4, '0')}`,
+      items: [{ itemId: rawItem.itemId, itemName: rawItem.name, quantity: qty }],
+      source: rawItem.source || 'Central Office',
+      allocationId: `AL-${Date.now()}`,
+      createdBy: user?.uid,
+    };
+    addTransfer(allocation);
+    addNotification({ title: 'Resource Allocated', message: `${qty}× ${rawItem.name} allocated to ${allocation.targetSchoolName}`, type: 'allocation', forAdmin: true, forSchoolId: allocateSchool, transferId: allocation.id });
+
+    setAllocateSelection(null);
+    setAllocateSchool('');
+    setAllocateQty(0);
+  };
+
+  // Handle bulk even split allocation
+  const handleBulkAllocate = () => {
+    if (!allocateSelection || bulkPerSchool <= 0 || selectedSchools.length === 0) return;
+    const rawItem = rawInventory.find((r) => r.itemId === allocateSelection.itemId || r.id === allocateSelection.id);
+    if (!rawItem) return addNotification({ title: 'Allocation Failed', message: 'Selected resource not found', type: 'error', forAdmin: true });
+    
+    const totalNeeded = bulkPerSchool * selectedSchools.length;
+    if ((rawItem.quantity || 0) < totalNeeded) return addNotification({ title: 'Allocation Failed', message: `Insufficient stock. Need ${totalNeeded}, have ${rawItem.quantity}`, type: 'error', forAdmin: true });
+
+    // Update raw inventory
+    updateRawEntry(rawItem.id, { quantity: Math.max(0, (rawItem.quantity || 0) - totalNeeded) });
+
+    // Create allocations for each selected school
+    selectedSchools.forEach((schoolId, index) => {
+      const allocation = {
+        id: `alloc-${Date.now()}-${index}`,
+        type: 'Allocation',
+        schoolId: SDO_SCHOOL.id,
+        schoolName: SDO_SCHOOL.name,
+        targetSchoolId: schoolId,
+        targetSchoolName: schools.find(s => s.id === schoolId)?.name || schoolId,
+        status: 'Allocated',
+        date: new Date().toISOString().split('T')[0],
+        refNo: `AL-${String(transfers.length + index + 1).padStart(4, '0')}`,
+        items: [{ itemId: rawItem.itemId, itemName: rawItem.name, quantity: bulkPerSchool }],
+        source: rawItem.source || 'Central Office',
+        allocationId: `AL-${Date.now()}-${index}`,
+        createdBy: user?.uid,
+      };
+      addTransfer(allocation);
+      addNotification({ 
+        title: 'Resource Allocated', 
+        message: `${bulkPerSchool}× ${rawItem.name} allocated to ${allocation.targetSchoolName}`, 
+        type: 'allocation', 
+        forAdmin: true, 
+        forSchoolId: schoolId, 
+        transferId: allocation.id 
+      });
+    });
+
+    // Reset form
+    setAllocateSelection(null);
+    setBulkTotalQty(0);
+    setSelectedSchools([]);
+    setBulkPerSchool(0);
+  };
+
   return (
     <div className="min-h-screen">
       <Header
         title="Resource Sharing Hub"
         subtitle={
           isAdmin
-            ? 'All undistributed supplies are auto-posted here for schools to request'
-            : 'View transfer activity and request supplies from the SDO warehouse'
+            ? 'Manage resource allocations to schools'
+            : 'View allocations assigned to your school'
         }
       />
 
       <div className="p-6 space-y-8 animate-fade-in">
-        {/* ========== NEW: Announcements Banner (Schools Only) ========== */}
+        {/* Announcements Banner */}
         {!isAdmin && announcements.length > 0 && (
           <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-500">
             {announcements.map((ann, idx) => (
@@ -437,17 +369,216 @@ const ResourceHub = () => {
           </div>
         )}
 
-        {/* Success messages */}
-        {showSuccess && (
-          <div className="p-4 rounded-lg bg-success/10 border border-success/20 flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
-            <CheckCircle className="w-5 h-5 text-success" />
-            <p className="text-success font-medium">Request submitted. It is logged in the Transfers tab. Admin will be notified and will accept or reject.</p>
-          </div>
+        {/* SDO Admin Panel: Allocate Resources to Schools */}
+        {isAdmin && (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gift className="w-5 h-5 text-primary" />
+                SDO Allocation Editor
+              </CardTitle>
+              <CardDescription>
+                Allocate resources to schools using manual per-school allocation or bulk even split method.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Allocation Method Toggle */}
+              <div className="flex gap-2 mb-4">
+                <Button
+                  variant={allocationMethod === 'manual' ? 'default' : 'outline'}
+                  onClick={() => setAllocationMethod('manual')}
+                  className="flex-1"
+                >
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Manual Allocation
+                </Button>
+                <Button
+                  variant={allocationMethod === 'bulk' ? 'default' : 'outline'}
+                  onClick={() => setAllocationMethod('bulk')}
+                  className="flex-1"
+                >
+                  <ArrowLeftRight className="w-4 h-4 mr-2" />
+                  Bulk Even Split
+                </Button>
+              </div>
+
+              {/* Resource Selection */}
+              <div className="mb-4">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase">Select Resource</Label>
+                <Select 
+                  value={allocateSelection ? allocateSelection.id : ''} 
+                  onValueChange={(val) => {
+                    setAllocateSelection(filteredRaw.find(r => r.id === val) || null);
+                    calculateBulkAllocation();
+                  }}
+                >
+                  <SelectTrigger className="w-full mt-1">
+                    <SelectValue placeholder="Select a resource from warehouse" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredRaw.map(r => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.name} — {r.quantity} {r.unit} available
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Manual Allocation Mode */}
+              {allocationMethod === 'manual' && (
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase">Select School</Label>
+                    <Select value={allocateSchool} onValueChange={setAllocateSchool}>
+                      <SelectTrigger className="w-full mt-1">
+                        <SelectValue placeholder="Select a school" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {schools.filter(s => s.id !== 'sdo').map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase">Quantity to Allocate</Label>
+                    <Input 
+                      type="number" 
+                      placeholder="Enter quantity" 
+                      value={allocateQty} 
+                      onChange={(e) => setAllocateQty(Number(e.target.value))}
+                      className="mt-1"
+                    />
+                    {allocateSelection && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Available: {allocateSelection.quantity} {allocateSelection.unit}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <Button 
+                      onClick={handleAllocateToSchool}
+                      disabled={!allocateSelection || !allocateSchool || allocateQty <= 0}
+                    >
+                      <Gift className="w-4 h-4 mr-2" />
+                      Allocate to School
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Bulk Even Split Mode */}
+              {allocationMethod === 'bulk' && allocateSelection && (
+                <div className="space-y-4">
+                  <div className="p-3 rounded-lg bg-muted/50 border">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Resource:</span>
+                        <p className="font-semibold">{allocateSelection.name}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Available:</span>
+                        <p className="font-semibold">{allocateSelection.quantity} {allocateSelection.unit}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase">Total Quantity to Distribute</Label>
+                    <Input 
+                      type="number" 
+                      placeholder="Enter total quantity to distribute"
+                      value={bulkTotalQty}
+                      onChange={(e) => {
+                        setBulkTotalQty(Number(e.target.value));
+                        calculateBulkAllocation();
+                      }}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {selectedSchools.length > 0 && bulkPerSchool > 0 && (
+                    <div className="p-3 rounded-lg bg-success/10 border border-success/30">
+                      <p className="text-sm font-semibold text-success">
+                        Each school will receive: {bulkPerSchool} {allocateSelection.unit}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {selectedSchools.length} schools × {bulkPerSchool} = {bulkPerSchool * selectedSchools.length} total
+                      </p>
+                    </div>
+                  )}
+
+                  {/* School Selection for Bulk */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase">Select Schools to Receive</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (selectedSchools.length === schools.filter(s => s.id !== 'sdo').length) {
+                            setSelectedSchools([]);
+                          } else {
+                            setSelectedSchools(schools.filter(s => s.id !== 'sdo').map(s => s.id));
+                          }
+                        }}
+                      >
+                        {selectedSchools.length === schools.filter(s => s.id !== 'sdo').length ? 'Deselect All' : 'Select All'}
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-lg p-2">
+                      {schools.filter(s => s.id !== 'sdo').map(school => (
+                        <label
+                          key={school.id}
+                          className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                            selectedSchools.includes(school.id) ? 'bg-primary/10 border-primary' : 'hover:bg-muted'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedSchools.includes(school.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedSchools([...selectedSchools, school.id]);
+                              } else {
+                                setSelectedSchools(selectedSchools.filter(id => id !== school.id));
+                              }
+                              calculateBulkAllocation();
+                            }}
+                            className="rounded border-input"
+                          />
+                          <span className="text-sm truncate">{school.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <Button 
+                      onClick={handleBulkAllocate}
+                      disabled={!allocateSelection || bulkTotalQty <= 0 || selectedSchools.length === 0 || bulkPerSchool <= 0}
+                    >
+                      <Gift className="w-4 h-4 mr-2" />
+                      Distribute to {selectedSchools.length} Schools
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {allocationMethod === 'bulk' && !allocateSelection && (
+                <div className="text-center py-4 text-muted-foreground">
+                  <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Select a resource to begin bulk allocation</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
-        {/* ========== NEW: Statistics Dashboard (School View) ========== */}
+        {/* Statistics Dashboard (School View) */}
         {!isAdmin && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Available Items Card */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '0ms' }}>
               <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 transition-all duration-300 hover:shadow-lg hover:border-primary/40">
@@ -466,57 +597,41 @@ const ResourceHub = () => {
               </Card>
             </div>
 
-            {/* Approved Card */}
+            {/* Allocations Card */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '75ms' }}>
               <Card className="bg-gradient-to-br from-success/5 to-success/10 border-success/20 transition-all duration-300 hover:shadow-lg hover:border-success/40">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-success" />
-                    Approved
+                    My Allocations
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{myRequestHistory.filter(r => r.status === 'Approved' || r.status === 'In Transit' || r.status === 'Received').length}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Approved & delivered</p>
+                  <div className="text-2xl font-bold">{myAllocations.length}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Resources allocated to your school</p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Pending Card */}
+            {/* Total Transfers Card */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '150ms' }}>
-              <Card className="bg-gradient-to-br from-warning/5 to-warning/10 border-warning/20 transition-all duration-300 hover:shadow-lg hover:border-warning/40">
+              <Card className="bg-gradient-to-br from-info/5 to-info/10 border-info/20 transition-all duration-300 hover:shadow-lg hover:border-info/40">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-warning" />
-                    Pending
+                    <TrendingUp className="w-4 h-4 text-info" />
+                    Total Transfers
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{myRequestHistory.filter(r => r.status?.includes('Pending')).length}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Awaiting SDO approval</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Rejected Card */}
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '225ms' }}>
-              <Card className="bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20 transition-all duration-300 hover:shadow-lg hover:border-destructive/40">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                    <XCircle className="w-4 h-4 text-destructive" />
-                    Rejected
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{myRequestHistory.filter(r => r.status === 'Rejected').length}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Requests not approved</p>
+                  <div className="text-2xl font-bold">{stats.totalAllTransfers}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Division-wide transfers</p>
                 </CardContent>
               </Card>
             </div>
           </div>
         )}
 
-        {/* ========== NEW: Admin Statistics ========== */}
+        {/* Admin Statistics */}
         {isAdmin && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
@@ -532,23 +647,10 @@ const ResourceHub = () => {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-warning/5 to-warning/10 border-warning/20">
+            <Card className="bg-gradient-to-br from-success/5 to-success/10 border-success/20">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-warning" />
-                  Pending Requests
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalPendingRequests}</div>
-                <p className="text-xs text-muted-foreground mt-1">Awaiting approval</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-success/5 to-success/10 border-success/20 transition-all duration-300 hover:shadow-lg hover:border-success/40">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-success" />
+                  <CheckCircle className="w-4 h-4 text-success" />
                   Completed Transfers
                 </CardTitle>
               </CardHeader>
@@ -557,539 +659,260 @@ const ResourceHub = () => {
                 <p className="text-xs text-muted-foreground mt-1">Approved, in transit, or delivered</p>
               </CardContent>
             </Card>
+
+            <Card className="bg-gradient-to-br from-info/5 to-info/10 border-info/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-info" />
+                  Total Transfers
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalAllTransfers}</div>
+                <p className="text-xs text-muted-foreground mt-1">All division transfers</p>
+              </CardContent>
+            </Card>
           </div>
         )}
-        {/* ========== NEW: Request History View (Schools Only) ========== */}
+
+        {/* My Allocations Section (Schools Only) */}
         {!isAdmin && (
-          <Card className="border-info/30 bg-info/5">
-            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <Card className="border-success/30 bg-success/5">
+            <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-info/20">
-                  <History className="w-5 h-5 text-info" />
+                <div className="p-2 rounded-lg bg-success/20">
+                  <Package className="w-5 h-5 text-success" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg">Your Request History</CardTitle>
+                  <CardTitle className="text-lg">My Allocations</CardTitle>
                   <CardDescription className="mt-0.5">
-                    Track all your transfer requests
+                    Resources allocated to your school by SDO. These are SDO-initiated allocations — you do not need to request.
                   </CardDescription>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewRequestHistory(!viewRequestHistory)}
-              >
-                {viewRequestHistory ? 'Hide' : 'Show'}
-              </Button>
             </CardHeader>
-            {viewRequestHistory && (
-              <CardContent className="pt-4 space-y-4">
-                {myRequestHistory.length > 0 ? (
-                  <>
-                    {/* Active/Recent Transfer Status Indicator */}
-                    {myRequestHistory[0] && (myRequestHistory[0].status?.includes('Pending') || myRequestHistory[0].status === 'In Transit' || myRequestHistory[0].status === 'Approved') && (
-                      <div className="p-4 rounded-lg bg-white/50 border border-info/30 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-muted-foreground">Current Transfer Status</p>
-                          <p className="text-xs text-muted-foreground">{myRequestHistory[0].date && new Date(myRequestHistory[0].date).toLocaleDateString('en-PH')}</p>
+            <CardContent className="pt-4">
+              {myAllocations.length > 0 ? (
+                <div className="space-y-3">
+                  {myAllocations.slice(0, 10).map((alloc) => (
+                    <div key={alloc.id} className="p-4 rounded-lg bg-background border border-success/30 flex justify-between items-start">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium text-sm">{alloc.items?.map(i => i.itemName).join(', ')}</p>
+                          <Badge className="bg-success/20 text-success border-0 text-xs">
+                            {alloc.status === 'Allocated' ? 'Allocated' : alloc.status}
+                          </Badge>
                         </div>
-                        <p className="text-sm font-medium">
-                          {myRequestHistory[0].items?.map(i => i.itemName).join(', ')}
+                        <p className="text-xs text-muted-foreground">
+                          {alloc.date && new Date(alloc.date).toLocaleDateString('en-PH')} • 
+                          Quantity: {alloc.items?.reduce((sum, i) => sum + i.quantity, 0)} • 
+                          Source: {alloc.source || 'SDO'}
                         </p>
-                        <TransferStatusIndicator 
-                          status={myRequestHistory[0].status}
-                          urgency={myRequestHistory[0].urgency}
-                        />
-                        {myRequestHistory[0].status === 'In Transit' && (
+                      </div>
+                      <div className="ml-2">
+                        {alloc.status === 'Allocated' && (
                           <Button
-                            onClick={() => handleMarkReceivedClick(myRequestHistory[0])}
-                            className="w-full mt-4 bg-success/20 text-success hover:bg-success/30 border border-success/50"
+                            size="sm"
                             variant="outline"
+                            className="h-8 text-success border-success/30 hover:bg-success/10 hover:text-success"
+                            onClick={() => handleMarkReceivedClick(alloc)}
                           >
-                            <Check className="w-4 h-4 mr-2" />
-                            Mark as Received
+                            <Check className="w-4 h-4 mr-1" />
+                            Mark Received
                           </Button>
                         )}
                       </div>
-                    )}
-                    
-                    {/* Full Request History List */}
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold text-muted-foreground px-1">All Requests</p>
-                      <div className="max-h-64 overflow-y-auto space-y-2">
-                        {myRequestHistory.slice(0, 10).map((req) => (
-                          <div key={req.id} className="p-3 rounded-lg bg-background border border-border flex justify-between items-start">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-sm">{req.items?.map(i => i.itemName).join(', ')}</p>
-                              <p className="text-xs text-muted-foreground">{req.date}</p>
-                            </div>
-                            <div className="text-right ml-2">{getStatusBadge(req.status)}</div>
-                          </div>
-                        ))}
-                      </div>
                     </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No requests yet.</p>
-                )}
-              </CardContent>
-            )}
-          </Card>
-        )}
-
-        {/* ========== SCHOOL VIEW: Clear two-section layout ========== */}
-        {!isAdmin && (
-          <>
-            {/* Section 1 — VIEW: Transfer activity (visible in all school resource hubs) */}
-            <Card className="border-info/30 bg-info/5 overflow-hidden">
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-info/20">
-                    <Eye className="w-5 h-5 text-info" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">View — Transfer activity</CardTitle>
-                    <CardDescription className="mt-0.5">
-                      All division transfers are shown here for transparency. View only — no actions. Same list for every school.
-                    </CardDescription>
-                  </div>
+                  ))}
                 </div>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="rounded-lg border border-border bg-card overflow-hidden">
-                  <div className="overflow-x-auto max-h-[380px] overflow-y-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/60 sticky top-0 z-10">
-                        <tr>
-                          <th className="text-left p-3 font-semibold">Ref. No.</th>
-                          <th className="text-left p-3 font-semibold whitespace-nowrap">Date</th>
-                          <th className="text-left p-3 font-semibold">From</th>
-                          <th className="text-left p-3 font-semibold">To</th>
-                          <th className="text-left p-3 font-semibold">Items</th>
-                          <th className="text-left p-3 font-semibold">Status</th>
-                          <th className="text-left p-3 font-semibold">Urgency</th>
-                          <th className="text-right p-3 font-semibold">Details</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allTransfersSorted.map((t) => (
-                          <tr key={t.id} className="border-t border-border hover:bg-muted/40">
-                            <td className="p-3 font-mono text-xs sm:text-sm">{t.refNo}</td>
-                            <td className="p-3 whitespace-nowrap">
-                              {t.date
-                                ? new Date(t.date).toLocaleDateString('en-PH', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric',
-                                  })
-                                : '—'}
-                            </td>
-                            <td className="p-3">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                                <span className="truncate max-w-[140px] sm:max-w-[200px]">{t.schoolName}</span>
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                                <span className="truncate max-w-[140px] sm:max-w-[200px]">{t.targetSchoolName}</span>
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              {t.items?.length
-                                ? t.items.map((i, idx) => (
-                                    <span key={idx}>
-                                      {i.quantity}× {i.itemName}
-                                      {idx < t.items.length - 1 ? '; ' : ''}
-                                    </span>
-                                  ))
-                                : '—'}
-                            </td>
-                            <td className="p-3">{getStatusBadge(t.status)}</td>
-                            <td className="p-3">
-                              {t.urgency ? (
-                                <Badge className={`
-                                  ${t.urgency === 'critical' ? 'bg-destructive/20 text-destructive border-0' : ''}
-                                  ${t.urgency === 'urgent' ? 'bg-warning/20 text-warning border-0' : ''}
-                                  ${t.urgency === 'normal' ? 'bg-primary/20 text-primary border-0' : ''}
-                                `}>
-                                  {t.urgency === 'critical' && <AlertCircle className="w-3 h-3 mr-1" />}
-                                  {t.urgency === 'urgent' && <Zap className="w-3 h-3 mr-1" />}
-                                  {t.urgency.charAt(0).toUpperCase() + t.urgency.slice(1)}
-                                </Badge>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </td>
-                            <td className="p-3 text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8"
-                                onClick={() => setSelectedTransferView(t)}
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              ) : (
+                <div className="text-center py-6">
+                  <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">No allocations yet.</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    SDO will allocate resources to your school when donations arrive. Check back later or contact the division office.
+                  </p>
                 </div>
-                {allTransfersSorted.length === 0 && (
-                  <p className="text-sm text-muted-foreground py-8 text-center">No transfers yet.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Section 2 — REQUEST: Available supplies from SDO */}
-            <Card className="border-primary/30 bg-primary/5 overflow-hidden">
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-primary/20">
-                    <Package className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">Request — Supplies for your school</CardTitle>
-                    <CardDescription className="mt-0.5">
-                      Request items from the SDO warehouse. Your request goes to Transfers for approval.
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4 space-y-6">
-                {/* Search and filter for request section */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search items..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="w-full sm:w-48">
-                      <SelectValue placeholder="All Categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-
-                {/* SDO warehouse — requestable */}
-                <div>
-                  <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                    <Warehouse className="w-4 h-4 text-primary" />
-                    Available from SDO warehouse
-                  </h4>
-                  {filteredRaw.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredRaw.map((row, idx) => (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${(idx % 6) * 50}ms` }}>
-                        <Card
-                          key={row.id}
-                          className="hover:shadow-md hover:border-primary/40 transition-all cursor-pointer border-2 h-full"
-                          onClick={() => openRequestDialog(row, 'raw')}
-                        >
-                          <CardHeader className="pb-2">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <CardTitle className="text-base leading-tight">{row.name}</CardTitle>
-                                <CardDescription className="mt-1">{row.code} • {row.category}</CardDescription>
-                              </div>
-                              <Badge className="bg-primary/20 text-primary border-0 shrink-0">SDO</Badge>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <p className="text-sm text-muted-foreground mb-3">
-                              Available: <strong className="text-foreground">{row.quantity}</strong> {row.unit}
-                            </p>
-                            <Button className="w-full" variant="default" size="sm" onClick={() => openRequestDialog(row, 'raw')}>
-                              Request transfer
-                              <ArrowRight className="w-4 h-4 ml-2" />
-                            </Button>
-                          </CardContent>
-                        </Card>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground py-4 rounded-lg bg-muted/30 px-4">
-                      No items available from SDO warehouse at the moment. Check back later or contact the division office.
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* NEW: FAQ/Guidelines Section */}
-            <Card className="border-blue/30 bg-blue/5">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-blue-600" />
-                  Resource Sharing Guidelines & FAQ
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <details className="group">
-                  <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
-                    <span>How do I request items from SDO warehouse?</span>
-                    <span className="group-open:rotate-180 transition-transform">▼</span>
-                  </summary>
-                  <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
-                    Go to the "Request — Supplies for your school" section, browse available items from the SDO warehouse, click on an item card, enter the quantity needed, select urgency level, provide a reason, then submit. Your request will be logged and sent to SDO for approval.
-                  </p>
-                </details>
-
-                <details className="group">
-                  <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
-                    <span>Can I request multiple items at once?</span>
-                    <span className="group-open:rotate-180 transition-transform">▼</span>
-                  </summary>
-                  <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
-                    No, each request is for one item only. You need to submit separate requests for each item. However, you can submit multiple requests one after another. Each request will be processed individually by the SDO.
-                  </p>
-                </details>
-
-                <details className="group">
-                  <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
-                    <span>What are urgency levels and why do they matter?</span>
-                    <span className="group-open:rotate-180 transition-transform">▼</span>
-                  </summary>
-                  <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
-                    When requesting, you can mark your request as <strong>Normal</strong>, <strong>Urgent</strong>, or <strong>Critical</strong>. Urgent and critical requests get priority during the approval process. Use Critical only for emergencies or essential needs.
-                  </p>
-                </details>
-
-                <details className="group">
-                  <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
-                    <span>How long does approval take?</span>
-                    <span className="group-open:rotate-180 transition-transform">▼</span>
-                  </summary>
-                  <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
-                    Typically 1-3 business days. You can track your request status in the "View — Transfer activity" section or check "Your Request History". You will also receive notifications when your request status changes.
-                  </p>
-                </details>
-
-                <details className="group">
-                  <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
-                    <span>What happens after my request is approved?</span>
-                    <span className="group-open:rotate-180 transition-transform">▼</span>
-                  </summary>
-                  <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
-                    Once approved by SDO, the status changes to "In Transit." The items will be delivered to your school. You can track the delivery status in the "View — Transfer activity" section.
-                  </p>
-                </details>
-
-                <details className="group">
-                  <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
-                    <span>What if my request is rejected?</span>
-                    <span className="group-open:rotate-180 transition-transform">▼</span>
-                  </summary>
-                  <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
-                    If rejected, the status will show as "Rejected" with a red badge. The rejection reason will be shown in the transfer details. You may contact the SDO for clarification or resubmit a new request with modifications.
-                  </p>
-                </details>
-
-                <details className="group">
-                  <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
-                    <span>How do I view all transfer activities?</span>
-                    <span className="group-open:rotate-180 transition-transform">▼</span>
-                  </summary>
-                  <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
-                    Go to the "View — Transfer activity" section to see all division transfers. This is a transparent view showing all requests across schools. You can also click on "Details" to see full information about any transfer.
-                  </p>
-                </details>
-
-                <details className="group">
-                  <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
-                    <span>Who can approve or reject transfer requests?</span>
-                    <span className="group-open:rotate-180 transition-transform">▼</span>
-                  </summary>
-                  <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
-                    Only SDO Administrators can approve or reject transfer requests. Schools can only submit requests and view the status. When a request is approved, it changes to "In Transit"; when rejected, it shows "Rejected" with a reason.
-                  </p>
-                </details>
-              </CardContent>
-            </Card>
-          </>
-        )}
-
-        {/* ========== ADMIN VIEW ========== */}
-        {isAdmin && (
-          <>
-            {/* Public Transfer Activity — same as schools, for admin */}
-            <Card className="border-primary/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <ArrowLeftRight className="w-5 h-5 text-primary" />
-                  Transfer activity (transparency)
-                </CardTitle>
-                <CardDescription>
-                  All transfers are listed here for transparency. Includes pending, approved, and rejected. View details only — no actions.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-lg border overflow-hidden">
-                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/50 sticky top-0">
-                        <tr>
-                          <th className="text-left p-3 font-semibold">Ref. No.</th>
-                          <th className="text-left p-3 font-semibold whitespace-nowrap">Date</th>
-                          <th className="text-left p-3 font-semibold">From</th>
-                          <th className="text-left p-3 font-semibold">To</th>
-                          <th className="text-left p-3 font-semibold">Items</th>
-                          <th className="text-left p-3 font-semibold">Status</th>
-                          <th className="text-right p-3 font-semibold">Details</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allTransfersSorted.map((t) => (
-                          <tr key={t.id} className="border-t border-border hover:bg-muted/30">
-                            <td className="p-3 font-mono">{t.refNo}</td>
-                            <td className="p-3 whitespace-nowrap">
-                              {t.date
-                                ? new Date(t.date).toLocaleDateString('en-PH', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric',
-                                  })
-                                : '—'}
-                            </td>
-                            <td className="p-3">
-                              <div className="flex items-center gap-1.5">
-                                <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                                <span className="truncate max-w-[180px]">{t.schoolName}</span>
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              <div className="flex items-center gap-1.5">
-                                <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                                <span className="truncate max-w-[180px]">{t.targetSchoolName}</span>
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              {t.items?.length
-                                ? t.items.map((i, idx) => (
-                                    <span key={idx}>
-                                      {i.quantity}× {i.itemName}
-                                      {idx < t.items.length - 1 ? '; ' : ''}
-                                    </span>
-                                  ))
-                                : '—'}
-                            </td>
-                            <td className="p-3">{getStatusBadge(t.status)}</td>
-                            <td className="p-3 text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8"
-                                onClick={() => setSelectedTransferView(t)}
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                {allTransfersSorted.length === 0 && (
-                  <p className="text-sm text-muted-foreground py-6 text-center">No transfers yet.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {pendingRequests.length > 0 && (
-          <Card className="border-info/30 bg-info/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ClipboardList className="w-5 h-5 text-info" />
-                Pending requests ({pendingRequests.length})
-              </CardTitle>
-              <CardDescription>Approve or reject transfer requests directly from here.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                {pendingRequests.slice(0, 5).map((t) => (
-                  <li key={t.id} className="flex justify-between items-center p-3 rounded bg-background border border-border">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium">{t.targetSchoolName}</p>
-                      <p className="text-xs text-muted-foreground truncate">{t.items?.map((i) => `${i.itemName} (${i.quantity})`).join(', ')}</p>
-                    </div>
-                    <div className="flex items-center gap-2 ml-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="h-8 text-success border-success/30 hover:bg-success/10 hover:text-success"
-                        onClick={() => handleApproveClick(t)}
-                      >
-                        <Check className="w-4 h-4 mr-1" />
-                        Approve
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="h-8 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => handleRejectClick(t)}
-                      >
-                        <X className="w-4 h-4 mr-1" />
-                        Reject
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              )}
             </CardContent>
           </Card>
         )}
 
-            {/* Admin: All undistributed supplies */}
-            <div>
-              <h3 className="text-lg font-display font-semibold text-foreground mb-2 flex items-center gap-2">
-                <Warehouse className="w-5 h-5 text-primary" />
-                Undistributed / raw supplies (auto-posted)
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Same list as Inventory → SDO Warehouse. All items here are visible to schools so they can request transfers. No manual posting needed.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-                    placeholder="Search items..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Transfer Activity - Visible to All */}
+        <Card className="border-info/30 bg-info/5 overflow-hidden">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-info/20">
+                <Eye className="w-5 h-5 text-info" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Transfer Activity</CardTitle>
+                <CardDescription className="mt-0.5">
+                  All division transfers are shown here for transparency. View only.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="overflow-x-auto max-h-[380px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/60 sticky top-0 z-10">
+                    <tr>
+                      <th className="text-left p-3 font-semibold">Ref. No.</th>
+                      <th className="text-left p-3 font-semibold whitespace-nowrap">Date</th>
+                      <th className="text-left p-3 font-semibold">From</th>
+                      <th className="text-left p-3 font-semibold">To</th>
+                      <th className="text-left p-3 font-semibold">Items</th>
+                      <th className="text-left p-3 font-semibold">Status</th>
+                      <th className="text-right p-3 font-semibold">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allTransfersSorted.map((t) => (
+                      <tr key={t.id} className="border-t border-border hover:bg-muted/40">
+                        <td className="p-3 font-mono text-xs sm:text-sm">{t.refNo}</td>
+                        <td className="p-3 whitespace-nowrap">
+                          {t.date
+                            ? new Date(t.date).toLocaleDateString('en-PH', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })
+                            : '—'}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <span className="truncate max-w-[140px] sm:max-w-[200px]">{t.schoolName}</span>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <span className="truncate max-w-[140px] sm:max-w-[200px]">{t.targetSchoolName}</span>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          {t.items?.length
+                            ? t.items.map((i, idx) => (
+                                <span key={idx}>
+                                  {i.quantity}× {i.itemName}
+                                  {idx < t.items.length - 1 ? '; ' : ''}
+                                </span>
+                              ))
+                            : '—'}
+                        </td>
+                        <td className="p-3">{getStatusBadge(t.status)}</td>
+                        <td className="p-3 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => setSelectedTransferView(t)}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {allTransfersSorted.length === 0 && (
+              <p className="text-sm text-muted-foreground py-8 text-center">No transfers yet.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* FAQ/Guidelines Section - Schools Only */}
+        {!isAdmin && (
+          <Card className="border-blue/30 bg-blue/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-blue-600" />
+                Resource Sharing Guidelines & FAQ
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <details className="group">
+                <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
+                  <span>How does SDO allocate resources to schools?</span>
+                  <span className="group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
+                  The Schools Division Office allocates resources to schools based on available supplies and fund allocations. All allocations are SDO-initiated — schools do not need to submit requests. When an allocation is made to your school, it will appear in your dashboard under My Allocations.
+                </p>
+              </details>
+
+              <details className="group">
+                <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
+                  <span>How do I view all transfer activities?</span>
+                  <span className="group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
+                  Go to the "Transfer Activity" section to see all division transfers. This is a transparent view showing all allocations across schools. You can also click on "Details" to see full information about any transfer.
+                </p>
+              </details>
+
+              <details className="group">
+                <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
+                  <span>What should I do when I receive an allocation?</span>
+                  <span className="group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
+                  When an allocation is made to your school, you will see it in the "My Allocations" section. Click "Mark Received" to confirm receipt. This helps the SDO track the distribution of resources.
+                </p>
+              </details>
+
+              <details className="group">
+                <summary className="cursor-pointer font-semibold flex items-center justify-between p-3 rounded-lg hover:bg-muted/50">
+                  <span>Who manages the resource allocation?</span>
+                  <span className="group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <p className="text-sm text-muted-foreground px-3 py-2 bg-muted/30 rounded ml-2 mt-1">
+                  Only SDO Administrators can initiate resource allocations to schools. Schools can view their allocations and mark items as received, but cannot request specific items. Contact the division office if you have specific needs.
+                </p>
+              </details>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Admin: Undistributed Supplies */}
+        {isAdmin && (
+          <div>
+            <h3 className="text-lg font-display font-semibold text-foreground mb-2 flex items-center gap-2">
+              <Warehouse className="w-5 h-5 text-primary" />
+              Undistributed / Raw Supplies
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Items listed here are managed by the SDO. Use the allocation form above to distribute to schools.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search items..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredRaw.map((row) => (
                 <Card key={row.id} className="overflow-hidden">
@@ -1099,226 +922,26 @@ const ResourceHub = () => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground">Quantity: <strong>{row.quantity}</strong> {row.unit}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Schools see this in the hub and can request it.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Use allocation form to distribute to schools.</p>
                   </CardContent>
                 </Card>
               ))}
             </div>
             {filteredRaw.length === 0 && (
-              <p className="text-sm text-muted-foreground">No undistributed supplies yet. Add items in Inventory → SDO Warehouse; they will appear here automatically.</p>
+              <p className="text-sm text-muted-foreground">No undistributed supplies yet.</p>
             )}
           </div>
-          </>
         )}
       </div>
 
-      {/* Request Transfer Dialog */}
-      <Dialog
-        open={!!selectedItem}
-        onOpenChange={(o) => { if (!o) setSelectedItem(null); setRequestSource(null); }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Request Transfer</DialogTitle>
-          </DialogHeader>
-          {selectedItem && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-lg bg-muted">
-                <p className="font-medium">{selectedItem.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  From: {SDO_SCHOOL.name}
-                </p>
-                <p className="text-sm text-success font-medium mt-1">
-                  Available: {selectedItem.quantity} units
-                </p>
-              </div>
-              <div>
-                <Label>Quantity *</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={selectedItem.quantity}
-                  value={requestQuantity}
-                  onChange={(e) => setRequestQuantity(parseInt(e.target.value, 10) || 1)}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label>Urgency Level</Label>
-                <Select value={requestUrgency} onValueChange={setRequestUrgency}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="normal">
-                      <span className="flex items-center gap-2">Normal</span>
-                    </SelectItem>
-                    <SelectItem value="urgent">
-                      <span className="flex items-center gap-2">
-                        <Zap className="w-3 h-3" />
-                        Urgent
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="critical">
-                      <span className="flex items-center gap-2">
-                        <AlertCircle className="w-3 h-3" />
-                        Critical
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">Urgent requests get priority in approval</p>
-              </div>
-              <div>
-                <Label>Reason / Note *</Label>
-                <Textarea
-                  value={requestReason}
-                  onChange={(e) => setRequestReason(e.target.value)}
-                  placeholder="Why does your school need this?"
-                  className="mt-1"
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCancelRequest}>Cancel</Button>
-            <Button
-              onClick={handleRequestSubmit}
-              disabled={!requestReason.trim() || requestQuantity < 1}
-            >
-              Submit request
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Cancel Request Confirmation Dialog */}
-      <Dialog open={showCancelConfirm} onOpenChange={(open) => !open && setShowCancelConfirm(false)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-warning" />
-              Discard Request?
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Are you sure you want to discard this request? Any information you've entered will be lost.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCancelConfirm(false)}>
-              Keep Editing
-            </Button>
-            <Button variant="destructive" onClick={confirmCancelRequest}>
-              <X className="w-4 h-4 mr-2" />
-              Discard
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Approve/Reject Confirmation Dialog */}
-      <Dialog open={showApproveRejectDialog} onOpenChange={(open) => !open && setShowApproveRejectDialog(false)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {actionType === 'approve' ? (
-                <>
-                  <CheckCircle className="w-5 h-5 text-success" />
-                  Approve Transfer Request
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-5 h-5 text-destructive" />
-                  Reject Transfer Request
-                </>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-
-          {selectedTransfer && (
-            <div className="space-y-4">
-              {/* Transfer Summary */}
-              <div className="p-4 rounded-lg bg-muted space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">School:</span>
-                  <span className="font-medium">{selectedTransfer.targetSchoolName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Items:</span>
-                  <span className="font-medium text-right">
-                    {selectedTransfer.items?.map((i) => `${i.itemName} (${i.quantity})`).join(', ')}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Urgency:</span>
-                  <span className="font-medium capitalize">{selectedTransfer.urgency || 'Normal'}</span>
-                </div>
-              </div>
-
-              {/* Rejection Reason (only for reject) */}
-              {actionType === 'reject' && (
-                <div>
-                  <Label>Rejection Reason *</Label>
-                  <Textarea
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    placeholder="Please provide a reason for rejection..."
-                    className="mt-1"
-                  />
-                </div>
-              )}
-
-              {/* Action confirmation message */}
-              <div className="p-3 rounded-lg bg-info/10 border border-info/20">
-                <p className="text-sm text-info">
-                  {actionType === 'approve'
-                    ? 'Approving this request will change the status to "In Transit" and notify the requesting school.'
-                    : 'Rejecting this request will notify the requesting school with your reason.'}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowApproveRejectDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant={actionType === 'approve' ? 'default' : 'destructive'}
-              onClick={handleApproveRejectConfirm}
-              disabled={processingTransfer || (actionType === 'reject' && !rejectionReason.trim())}
-            >
-              {processingTransfer ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : actionType === 'approve' ? (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Confirm Approval
-                </>
-              ) : (
-                <>
-                  <X className="w-4 h-4 mr-2" />
-                  Confirm Rejection
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Public transfer detail (view only — transparency) */}
+      {/* Transfer Detail Dialog */}
       <Dialog open={!!selectedTransferView} onOpenChange={(open) => !open && setSelectedTransferView(null)}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
           <div className="flex-shrink-0">
-          <DialogHeader>
-              <DialogTitle className="font-display">Transfer details</DialogTitle>
+            <DialogHeader>
+              <DialogTitle className="font-display">Transfer Details</DialogTitle>
               <p className="text-sm text-muted-foreground">View only — for transparency.</p>
-          </DialogHeader>
+            </DialogHeader>
           </div>
           {selectedTransferView && (
             <div className="space-y-4 overflow-y-auto pr-1 flex-1">
@@ -1351,19 +974,7 @@ const ResourceHub = () => {
                   urgency={selectedTransferView.urgency}
                 />
               </div>
-              {typeof selectedTransferView.totalAmount === 'number' && selectedTransferView.totalAmount > 0 && (
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Total transfer amount</p>
-                  <p className="font-semibold">
-                    ₱
-                    {selectedTransferView.totalAmount.toLocaleString('en-PH', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </p>
-                </div>
-              )}
-            <div>
+              <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-2">Items</p>
                 <div className="space-y-2">
                   {selectedTransferView.items?.map((item, index) => (
@@ -1379,39 +990,15 @@ const ResourceHub = () => {
                       </div>
                       <div className="text-right space-y-1">
                         <span className="block font-semibold">{item.quantity}</span>
-                        {typeof item.unitPrice === 'number' && item.unitPrice > 0 && (
-                          <span className="block text-xs text-muted-foreground">
-                            ₱{item.unitPrice.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
-                            / {item.unit || 'unit'}
-                          </span>
-                        )}
-                        {(typeof item.totalCost === 'number' ||
-                          (typeof item.unitPrice === 'number' && item.unitPrice > 0)) && (
-                          <span className="block text-xs font-semibold">
-                            Total: ₱
-                            {(item.totalCost ?? (item.unitPrice * item.quantity)).toLocaleString('en-PH', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </span>
-                        )}
                       </div>
                     </div>
                   ))}
                 </div>
-            </div>
+              </div>
               {selectedTransferView.reason && (
-            <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Reason</p>
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground mb-1">Notes</p>
                   <p className="text-sm p-2 rounded bg-muted">{selectedTransferView.reason}</p>
-            </div>
-              )}
-              {selectedTransferView.rejectionReason && (
-            <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Rejection reason</p>
-                  <p className="text-sm p-2 rounded bg-destructive/10 text-destructive">
-                    {selectedTransferView.rejectionReason}
-                  </p>
                 </div>
               )}
               
@@ -1445,7 +1032,6 @@ const ResourceHub = () => {
 
           {transferToMarkReceived && (
             <div className="space-y-4">
-              {/* Transfer Summary */}
               <div className="p-4 rounded-lg bg-muted space-y-2">
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Items:</span>
@@ -1457,7 +1043,6 @@ const ResourceHub = () => {
                 </div>
               </div>
 
-              {/* Received Notes */}
               <div>
                 <Label>Notes (optional)</Label>
                 <Textarea
@@ -1468,7 +1053,6 @@ const ResourceHub = () => {
                 />
               </div>
 
-              {/* Confirmation message */}
               <div className="p-3 rounded-lg bg-success/10 border border-success/20">
                 <p className="text-sm text-success">
                   By confirming receipt, you acknowledge that your school has received all items listed above in good condition.
